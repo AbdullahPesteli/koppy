@@ -106,6 +106,16 @@ test("a direct image document remains a generic binary-copy candidate", () => {
     assert.equal(candidate.source, "src");
 });
 
+test("a directly opened Google thumbnail remains a generic binary-copy candidate", () => {
+    const url = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTw1xnvE-VFLix4oS6pdxpV4KwC2LhuT1Cl8Yk2Hfx2zw&s=10";
+    const dom = new JSDOM(`<!doctype html><img id="direct-thumb" width="447" height="447" src="${url}">`, { url });
+    const image = makeVisible(dom.window.document.getElementById("direct-thumb"), 447, 447);
+    const candidate = Koppy.resolveQuickHoverImageCandidates(image, { baseUrl: dom.window.location.href })[0];
+    assert.equal(candidate.url, url);
+    assert.equal(candidate.source, "src");
+    assert.equal(candidate.isThumbnailFallback, true);
+});
+
 test("generic candidates include CSS backgrounds, video posters and SVG image sources", () => {
     const dom = new JSDOM(`<!doctype html><body>
         <button id="card" style="width: 320px; height: 200px; background-image: url('https://cdn.example.test/card-original.webp')"></button>

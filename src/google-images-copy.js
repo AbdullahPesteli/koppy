@@ -166,14 +166,16 @@
         return imageUrlsFromAttributes(element, baseUrl)[0] || null;
     }
 
-    function imageSourceSet(element, baseUrl, includeDirectSource) {
+    function imageSourceSet(element, baseUrl, includeDirectSource, excludeKnownGoogleThumbnails) {
         const sources = [];
         const seen = new Set();
+        const shouldExcludeThumbnail = excludeKnownGoogleThumbnails !== false;
         const add = (raw, source) => {
             const normalized = normalizeCandidateUrl(raw, baseUrl);
-            if (!normalized || isKnownGoogleThumbnail(normalized) || seen.has(normalized)) return;
+            const isThumbnail = normalized && isKnownGoogleThumbnail(normalized);
+            if (!normalized || (shouldExcludeThumbnail && isThumbnail) || seen.has(normalized)) return;
             seen.add(normalized);
-            sources.push({ url: normalized, source });
+            sources.push({ url: normalized, source, isThumbnailFallback: !shouldExcludeThumbnail && isThumbnail });
         };
         parseSrcset(element && element.getAttribute && element.getAttribute("srcset"), baseUrl)
             .forEach(candidate => add(candidate.url, "srcset"));
@@ -338,7 +340,7 @@
         // A Google result can turn into a loaded, non-gstatic preview while its
         // metadata is still late. That visible source is safe to try; known Google
         // thumbnails remain explicitly excluded in imageSourceSet/add above.
-        imageSourceSet(element, baseUrl, isLikelyLoadedPreview(element)).forEach(candidate => add(candidate.url, candidate.source));
+        imageSourceSet(element, baseUrl, isLikelyLoadedPreview(element), true).forEach(candidate => add(candidate.url, candidate.source));
         // A Google result sometimes exposes only its encrypted thumbnail. It is not an
         // original, but it is still a real image the user can explicitly choose to copy.
         // Keep it strictly last and label it, so we never pretend it is high resolution.
@@ -361,11 +363,11 @@
         const baseUrl = settings.baseUrl || (element.ownerDocument && element.ownerDocument.baseURI) || "https://example.invalid/";
         const candidates = [];
         const seen = new Set();
-        const add = (url, source) => {
+        const add = (url, source, extra) => {
             const normalized = normalizeCandidateUrl(url, baseUrl);
             if (!normalized || seen.has(normalized)) return;
             seen.add(normalized);
-            candidates.push({ url: normalized, element, source });
+            candidates.push(Object.assign({ url: normalized, element, source }, extra || {}));
         };
 
         // Picviewer already knows how to resolve many site-specific previews. Prefer that
@@ -382,7 +384,7 @@
         imageUrlsFromAttributes(element, baseUrl).forEach(candidate => add(candidate.url, candidate.source));
         imageUrlsFromMediaElement(element, baseUrl).forEach(candidate => add(candidate.url, candidate.source));
         imageUrlsFromBackground(element, baseUrl).forEach(candidate => add(candidate.url, candidate.source));
-        if (String(element.nodeName).toUpperCase() === "IMG") imageSourceSet(element, baseUrl).forEach(candidate => add(candidate.url, candidate.source));
+        if (String(element.nodeName).toUpperCase() === "IMG") imageSourceSet(element, baseUrl, true, false).forEach(candidate => add(candidate.url, candidate.source, candidate));
         return candidates;
     }
 
