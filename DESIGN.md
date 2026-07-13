@@ -45,6 +45,10 @@ Koppy, görsel işi sırasında arka planda güvenilir kalan kişisel bir araçt
   %72'sine sığar; kullanıcı ölçü girerse bu sınır aynen uygulanır.
 - `⌘C` sırasında görselin alt kenarında ince, sakin bir ilerleme çizgisi görünür; başarıda kısa süre
   `Kopyalandı · genişlik×yükseklik` metnine dönüşür. Sayfa altındaki toast hata ve erişilebilirlik yedeğidir.
+- Tampermonkey menüsünden açılan **Canlı Kontrol**, tam ayar penceresinin yerine geçen ikinci bir form değildir:
+  yalnız önizleme tuşu, FloatBar konumu ve preview boyutu için küçük, sayfaya ilişen bir kontrol yüzeyidir.
+  Seçim gerçek `prefs` değerine kullanıcı tıklamasıyla anında yazılır; açık FloatBar/preview varsa değişiklik
+  hemen uygulanır, yoksa sonraki hover'da görünür. Daha seyrek veya sayısal kararlar “Tüm ayarları aç” altında kalır.
 - Arama bütün kategorileri tarar; sonuç sayısı veya açık boş-sonuç mesajı gösterilir.
 - Arama, kapalı bir İnce ayar içindeki eşleşmeyi bulursa ilgili bölümü açar.
 - Hareketler `prefers-reduced-motion` altında kapatılır.

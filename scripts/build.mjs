@@ -8,6 +8,7 @@ const upstreamPath = path.join(root, "vendor/picviewer-ce-plus/Picviewer CE+.use
 const modulePath = path.join(root, "src/google-images-copy.js");
 const settingsModulePath = path.join(root, "src/koppy-settings-ui.js");
 const previewModulePath = path.join(root, "src/koppy-preview-fit.js");
+const controlDeckModulePath = path.join(root, "src/koppy-control-deck.js");
 const runtimeDir = path.join(root, "vendor/runtime");
 const outputDir = path.join(root, "dist");
 const outputPath = path.join(outputDir, "Koppy.user.js");
@@ -17,6 +18,7 @@ let source = fs.readFileSync(upstreamPath, "utf8");
 const googleModuleSource = fs.readFileSync(modulePath, "utf8");
 const settingsModuleSource = fs.readFileSync(settingsModulePath, "utf8");
 const previewModuleSource = fs.readFileSync(previewModulePath, "utf8");
+const controlDeckModuleSource = fs.readFileSync(controlDeckModulePath, "utf8");
 const moduleSource = `${settingsModuleSource}\n\n        globalThis.KoppySettingsUI.install({
             config: GM_config,
             document: document,
@@ -34,7 +36,7 @@ const moduleSource = `${settingsModuleSource}\n\n        globalThis.KoppySetting
             },
             onOpenState: () => { isConfigOpen = true; },
             onCloseState: () => { isConfigOpen = false; },
-        });\n\n${previewModuleSource}\n\n${googleModuleSource}`;
+        });\n\n${controlDeckModuleSource}\n\n${previewModuleSource}\n\n${googleModuleSource}`;
 const runtimeHashes = new Map(fs.readFileSync(path.join(runtimeDir, "SHA256SUMS"), "utf8").trim().split("\n").map(line => {
     const match = line.match(/^([0-9a-f]{64})\s+(.+)$/);
     if (!match) throw new Error(`Invalid runtime hash line: ${line}`);
@@ -63,7 +65,7 @@ const replacements = new Map([
     ["// @name:pt-BR           Picviewer CE+", "// @name:pt-BR           Koppy"],
     ["// @name:ru              Picviewer CE+", "// @name:ru              Koppy"],
     ["// @author               NLF && ywzhaiqi && hoothin", "// @author               NLF && ywzhaiqi && hoothin; Koppy fork by pestly"],
-    ["// @version              2026.2.6.1", "// @version              0.2.6"],
+    ["// @version              2026.2.6.1", "// @version              0.2.7"],
     ["// @namespace            https://github.com/hoothin/UserScripts", "// @namespace            https://github.com/AbdullahPesteli/koppy"],
     ["// @homepage             https://pv.hoothin.com/", "// @homepage             https://github.com/AbdullahPesteli/koppy"],
     ["// @supportURL           https://github.com/hoothin/UserScripts/issues", "// @supportURL           https://github.com/AbdullahPesteli/koppy/issues"],
@@ -271,7 +273,19 @@ if (!source.includes(openPrefsSecureEntry)) throw new Error("Upstream openPrefs 
 source = source.replace(openPrefsSecureEntry, openPrefsSecureEntry
     + "\n            globalThis.KoppySettingsUI.openSecure();\n            return;");
 const integration = `${moduleSource}\n\n        globalThis.KoppyGoogleCopy.createController({\n            document: document,\n            window: window,\n            location: location,\n            navigator: navigator,\n            ClipboardItem: typeof ClipboardItem === "undefined" ? null : ClipboardItem,\n            gmRequest: _GM_xmlhttpRequest,\n            resolvePic: findPic,\n        }).start();\n        globalThis.KoppyPreviewFit.install({ ImgWindowC: ImgWindowC, prefs: prefs, window: window });\n\n`;
-source = source.replace(marker, integration + marker);
+const controlDeckIntegration = `        const koppyControlDeck = globalThis.KoppyControlDeck.install({
+            config: GM_config,
+            prefs: prefs,
+            document: document,
+            window: window,
+            getFloatBar: () => floatBar,
+            getPreview: () => uniqueImgWin,
+            openFullSettings: () => globalThis.KoppySettingsUI.openSecure(),
+        });
+        if (koppyControlDeck) _GM_registerMenuCommand("Koppy Canlı Kontrol", () => koppyControlDeck.toggle());
+
+`;
+source = source.replace(marker, integration + controlDeckIntegration + marker);
 
 fs.mkdirSync(outputDir, { recursive: true });
 fs.writeFileSync(outputPath, source);

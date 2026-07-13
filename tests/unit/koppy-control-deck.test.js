@@ -1,0 +1,97 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const { JSDOM } = require("jsdom");
+const Deck = require("../../src/koppy-control-deck.js");
+
+function setPath(target, path, value) {
+    const keys = path.split(".");
+    const last = keys.pop();
+    let cursor = target;
+    keys.forEach(key => { cursor = cursor[key]; });
+    cursor[last] = value;
+}
+
+function makeConfig(prefs) {
+    const names = [
+        "floatBar.position", "floatBar.previewMaxSizeW", "floatBar.previewMaxSizeH",
+        "floatBar.globalkeys.ctrl", "floatBar.globalkeys.alt", "floatBar.globalkeys.shift", "floatBar.globalkeys.command",
+    ];
+    const fields = Object.fromEntries(names.map(name => [name, { value: null }]));
+    return {
+        fields,
+        isOpen: false,
+        saves: 0,
+        set(name, value) { fields[name].value = value; },
+        save() {
+            this.saves += 1;
+            Object.entries(fields).forEach(([name, field]) => {
+                if (field.value !== null) setPath(prefs, name, field.value);
+            });
+            return true;
+        },
+    };
+}
+
+test("live control deck keeps a single modifier and persists choices immediately", () => {
+    const dom = new JSDOM("<!doctype html><html><body></body></html>");
+    const prefs = {
+        floatBar: {
+            position: "top right",
+            previewMaxSizeW: 0,
+            previewMaxSizeH: 0,
+            globalkeys: { ctrl: true, alt: false, shift: false, command: false },
+        },
+    };
+    const config = makeConfig(prefs);
+    let repositioned = 0;
+    const deck = Deck.install({
+        document: dom.window.document,
+        window: dom.window,
+        config,
+        prefs,
+        requireTrusted: false,
+        getFloatBar: () => ({ shown: true, data: {}, setPosition() { repositioned += 1; } }),
+    });
+
+    assert.equal(deck.show(), true);
+    const root = dom.window.document.querySelector("koppy-control-deck").shadowRoot;
+    assert.ok(root.querySelector(".panel.open"));
+
+    root.querySelector('button[aria-label="Command ile önizleme"]').click();
+    assert.deepEqual(prefs.floatBar.globalkeys, { ctrl: false, alt: false, shift: false, command: true });
+    assert.equal(config.saves, 1);
+
+    root.querySelector('button[aria-label="Sol alt"]').click();
+    assert.equal(prefs.floatBar.position, "bottom left");
+    assert.equal(repositioned, 1);
+
+    root.querySelectorAll(".text-button")[1].click();
+    assert.equal(prefs.floatBar.previewMaxSizeW, 720);
+    assert.equal(prefs.floatBar.previewMaxSizeH, 540);
+    assert.equal(config.saves, 3);
+});
+
+test("live control deck defers to the secure full settings dialog when it is already open", () => {
+    const dom = new JSDOM("<!doctype html><html><body></body></html>");
+    const prefs = { floatBar: { position: "top right", previewMaxSizeW: 0, previewMaxSizeH: 0, globalkeys: { ctrl: false, alt: false, shift: false, command: true } } };
+    const config = makeConfig(prefs);
+    config.isOpen = true;
+    let fullSettings = 0;
+    const deck = Deck.install({ document: dom.window.document, window: dom.window, config, prefs, requireTrusted: false, openFullSettings() { fullSettings += 1; } });
+    assert.equal(deck.show(), false);
+    assert.equal(fullSettings, 1);
+    assert.equal(dom.window.document.querySelector("koppy-control-deck"), null);
+});
+
+test("page-script clicks cannot change live control values", () => {
+    const dom = new JSDOM("<!doctype html><html><body></body></html>");
+    const prefs = { floatBar: { position: "top right", previewMaxSizeW: 0, previewMaxSizeH: 0, globalkeys: { ctrl: true, alt: false, shift: false, command: false } } };
+    const config = makeConfig(prefs);
+    const deck = Deck.install({ document: dom.window.document, window: dom.window, config, prefs });
+    deck.show();
+    const root = dom.window.document.querySelector("koppy-control-deck").shadowRoot;
+    root.querySelector('button[aria-label="Command ile önizleme"]').click();
+    assert.equal(config.saves, 0);
+    assert.equal(prefs.floatBar.globalkeys.ctrl, true);
+    assert.equal(prefs.floatBar.globalkeys.command, false);
+});
