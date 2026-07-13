@@ -51,6 +51,24 @@ test("live control deck applies a single modifier, repositions an active bar and
     await host.locator(".update").click();
     await expect.poll(() => page.evaluate(() => window.__updates)).toBe(1);
 
+    await host.locator(".pin").click();
+    await page.mouse.click(120, 120);
+    await expect(panel).toBeVisible();
+    await host.locator(".pin").click();
+    await page.mouse.click(120, 120);
+    await expect(host.locator(".panel.open")).toHaveCount(0);
+
+    await page.evaluate(() => window.__deck.show());
+    const handle = host.locator(".title");
+    const beforeDrag = await panel.boundingBox();
+    await handle.hover({ position: { x: 24, y: 24 } });
+    await page.mouse.down();
+    await page.mouse.move(760, 180);
+    await page.mouse.up();
+    const afterDrag = await panel.boundingBox();
+    expect(afterDrag.x).toBeLessThan(beforeDrag.x - 80);
+    expect(afterDrag.y).toBeLessThan(beforeDrag.y + 80);
+
     const box = await panel.boundingBox();
     expect(box.width).toBeLessThanOrEqual(340);
     expect(box.height).toBeLessThan(620);

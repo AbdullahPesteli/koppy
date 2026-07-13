@@ -103,6 +103,22 @@ test("live control deck exposes the update flow only when an updater is provided
     assert.match(root.querySelector(".status").textContent, /Güncelleme sayfası açıldı/);
 });
 
+test("a pinned live control deck stays open during page interaction and can be released", () => {
+    const dom = new JSDOM("<!doctype html><html><body></body></html>");
+    const prefs = { floatBar: { position: "top right", previewMaxSizeW: 0, previewMaxSizeH: 0, globalkeys: { ctrl: false, alt: false, shift: false, command: true } } };
+    const config = makeConfig(prefs);
+    const deck = Deck.install({ document: dom.window.document, window: dom.window, config, prefs, requireTrusted: false });
+    deck.show();
+    const root = dom.window.document.querySelector("koppy-control-deck").shadowRoot;
+    root.querySelector(".pin").click();
+    assert.equal(root.querySelector(".pin").getAttribute("aria-pressed"), "true");
+    dom.window.document.body.dispatchEvent(new dom.window.Event("pointerdown", { bubbles: true }));
+    assert.ok(root.querySelector(".panel.open"));
+    root.querySelector(".pin").click();
+    dom.window.document.body.dispatchEvent(new dom.window.Event("pointerdown", { bubbles: true }));
+    assert.ok(!root.querySelector(".panel.open"));
+});
+
 test("page-script clicks cannot change live control values", () => {
     const dom = new JSDOM("<!doctype html><html><body></body></html>");
     const prefs = { floatBar: { position: "top right", previewMaxSizeW: 0, previewMaxSizeH: 0, globalkeys: { ctrl: true, alt: false, shift: false, command: false } } };

@@ -44,8 +44,9 @@ kopyalanmaz; gerçek aday yoksa açık hata gösterilir. PNG, JPEG ve WebP deste
 “desteklenmeyen tür” hatasıyla reddedilir.
 
 Tampermonkey menüsündeki **Koppy Canlı Kontrol**, en sık üç kararı küçük bir panelden verir: önizleme tuşu,
-FloatBar konumu ve süzülen preview boyutu. Seçimler anında gerçek davranışa yazılır; açık bir FloatBar veya
-preview varsa mümkün olduğunda o anda yeniden konumlanır/ölçülür. Ayrıntılı ayarlar için aynı paneldeki
+FloatBar konumu ve süzülen preview boyutu. Panel üst sağda açılır; başlığından sürüklenebilir. Başlıktaki
+**sabitle** simgesi açıkken sayfada görselleri denerken panel kapanmaz; kapalıyken sayfaya tıklama paneli
+kapatır. Seçimler anında gerçek davranışa yazılır; açık bir FloatBar veya preview varsa mümkün olduğunda o anda yeniden konumlanır/ölçülür. Ayrıntılı ayarlar için aynı paneldeki
 **Tüm ayarları aç** eylemi kullanılır. Tam ayarlar ekranı; beş kategori, global ayar araması, sabit kaydetme çubuğu ve
 dar pencerede yatay kategori navigasyonu kullanır. Mevcut 91 Picviewer ayarı ve kayıtlı değerleri aynı
 `pv-prefs` saklama sözleşmesiyle korunur. Ayar belgesi ziyaret edilen siteden sandbox'lı opaque origin ile
