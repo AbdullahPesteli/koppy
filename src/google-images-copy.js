@@ -801,6 +801,11 @@
         return !(selection && String(selection).trim());
     }
 
+    function isModifierRelease(event) {
+        const key = String(event && event.key || "").toLowerCase();
+        return key === "control" || key === "meta" || key === "alt" || key === "shift";
+    }
+
     function isLikelyResultImage(image) {
         if (!isCopySurface(image)) return false;
         const rect = typeof image.getBoundingClientRect === "function" ? image.getBoundingClientRect() : null;
@@ -1046,6 +1051,8 @@
         }));
         let current = null;
         let activeCopy = null;
+        let activePreview = null;
+        let documentPreview = null;
         let lastPointer = null;
         let started = false;
 
@@ -1065,6 +1072,118 @@
             cancelCurrent();
             cancelState(activeCopy);
             activeCopy = null;
+            closeDocumentPreview();
+        }
+
+        function isDocumentPreviewGesture(event) {
+            if (typeof deps.isPreviewGesture === "function") {
+                try { return Boolean(deps.isPreviewGesture(event)); } catch (_) { return false; }
+            }
+            const platform = windowLike && windowLike.navigator && (windowLike.navigator.userAgentData && windowLike.navigator.userAgentData.platform || windowLike.navigator.platform || "");
+            return /mac/i.test(String(platform)) ? Boolean(event && event.metaKey) : Boolean(event && event.ctrlKey);
+        }
+
+        function ensureDocumentPreview() {
+            if (!documentLike || !documentLike.documentElement) return null;
+            if (documentPreview) return documentPreview;
+            const root = documentLike.createElement("div");
+            root.id = "koppy-document-preview";
+            root.setAttribute("aria-live", "polite");
+            Object.assign(root.style, {
+                position: "fixed", display: "none", pointerEvents: "none", zIndex: "2147483645",
+                boxSizing: "border-box", padding: "8px", borderRadius: "10px", overflow: "hidden",
+                background: "rgba(11, 14, 19, .94)", border: "1px solid rgba(124,156,255,.58)",
+                boxShadow: "0 12px 34px rgba(0,0,0,.38)", color: "#f4f7fb",
+                font: "600 11px/1.25 -apple-system, BlinkMacSystemFont, sans-serif",
+            });
+            const image = documentLike.createElement("img");
+            image.alt = "";
+            Object.assign(image.style, { display: "none", maxWidth: "440px", maxHeight: "330px", objectFit: "contain", background: "#fff", borderRadius: "5px" });
+            const label = documentLike.createElement("div");
+            Object.assign(label.style, { marginTop: "7px", whiteSpace: "nowrap" });
+            root.append(image, label);
+            documentLike.documentElement.appendChild(root);
+            documentPreview = { root, image, label, objectUrl: null };
+            return documentPreview;
+        }
+
+        function placeDocumentPreview(item) {
+            if (!item || !item.root || !lastPointer) return;
+            const viewportWidth = Number(windowLike && windowLike.innerWidth || 0);
+            const viewportHeight = Number(windowLike && windowLike.innerHeight || 0);
+            const width = Math.max(180, Math.min(456, Number(item.root.offsetWidth || 260)));
+            const height = Math.max(38, Math.min(Math.max(38, viewportHeight - 12), Number(item.root.offsetHeight || 44)));
+            const preferRight = lastPointer.x + 18 + width <= viewportWidth - 8;
+            const left = preferRight ? lastPointer.x + 18 : Math.max(8, lastPointer.x - width - 18);
+            const top = Math.max(8, Math.min(lastPointer.y + 16, Math.max(8, viewportHeight - height - 8)));
+            item.root.style.left = Math.round(left) + "px";
+            item.root.style.top = Math.round(top) + "px";
+        }
+
+        function closeDocumentPreview() {
+            if (activePreview) cancelState(activePreview);
+            activePreview = null;
+            if (!documentPreview) return;
+            if (documentPreview.objectUrl && windowLike && windowLike.URL && typeof windowLike.URL.revokeObjectURL === "function") {
+                windowLike.URL.revokeObjectURL(documentPreview.objectUrl);
+            }
+            documentPreview.objectUrl = null;
+            documentPreview.image.removeAttribute("src");
+            documentPreview.image.style.display = "none";
+            documentPreview.root.style.display = "none";
+        }
+
+        async function previewHoveredDocument() {
+            if (!current || !current.candidates.length || !isDocumentSurface(current.element) || activePreview) return;
+            const preview = ensureDocumentPreview();
+            if (!preview) return;
+            const state = {
+                element: current.element,
+                candidates: current.candidates.slice(),
+                activeRequest: null,
+                cancelled: false,
+            };
+            activePreview = state;
+            preview.image.style.display = "none";
+            preview.label.textContent = "Belge önizlemesi hazırlanıyor…";
+            preview.root.style.display = "block";
+            placeDocumentPreview(preview);
+            let lastError = null;
+            try {
+                for (const candidate of state.candidates) {
+                    if (state.cancelled) return;
+                    try {
+                        const request = requestImage(candidate.url);
+                        state.activeRequest = request;
+                        const downloaded = await request.promise;
+                        state.activeRequest = null;
+                        if (state.cancelled) return;
+                        const prepared = await normalizeImage(downloaded.blob);
+                        if (state.cancelled) return;
+                        const objectUrl = windowLike && windowLike.URL && typeof windowLike.URL.createObjectURL === "function"
+                            ? windowLike.URL.createObjectURL(prepared.blob) : null;
+                        if (!objectUrl) throw new Error("Tarayıcı belge önizlemesini desteklemiyor");
+                        if (preview.objectUrl) windowLike.URL.revokeObjectURL(preview.objectUrl);
+                        preview.objectUrl = objectUrl;
+                        preview.image.src = objectUrl;
+                        preview.image.style.display = "block";
+                        preview.label.textContent = "Belge önizlemesi · ⌘C ile kopyala";
+                        placeDocumentPreview(preview);
+                        return;
+                    } catch (error) {
+                        state.activeRequest = null;
+                        if (state.cancelled) return;
+                        lastError = error;
+                    }
+                }
+                if (!state.cancelled) {
+                    preview.label.textContent = "Belge önizlenemedi";
+                    placeDocumentPreview(preview);
+                    if (lastError) notify("Koppy: " + (lastError.message || "Belge önizlenemedi"), "error");
+                }
+            } finally {
+                if (activePreview === state) activePreview = null;
+            }
         }
 
         function resolveCandidates(image) {
@@ -1176,7 +1295,10 @@
         function onPointerMove(event) {
             lastPointer = { x: event.clientX, y: event.clientY };
             const image = imageAtPointer(event);
-            if (image) setHoveredImage(image, false);
+            if (image) {
+                setHoveredImage(image, false);
+                if (isDocumentPreviewGesture(event)) void previewHoveredDocument();
+            }
             else if (!pointerInsideCurrent()) cancelCurrent();
         }
 
@@ -1276,7 +1398,12 @@
         }
 
         function onKeyDown(event) {
+            if (isDocumentPreviewGesture(event)) void previewHoveredDocument();
             void copyHoveredImage(event);
+        }
+
+        function onKeyUp(event) {
+            if (isModifierRelease(event)) closeDocumentPreview();
         }
 
         return {
@@ -1285,6 +1412,7 @@
                 if (windowLike && windowLike.top && windowLike.self && windowLike.top !== windowLike.self) return false;
                 documentLike.addEventListener("pointermove", onPointerMove, true);
                 documentLike.addEventListener("keydown", onKeyDown, true);
+                documentLike.addEventListener("keyup", onKeyUp, true);
                 if (windowLike && windowLike.addEventListener) {
                     windowLike.addEventListener("popstate", refreshRoute);
                     windowLike.addEventListener("hashchange", refreshRoute);
@@ -1300,6 +1428,7 @@
                 if (!started) return;
                 documentLike.removeEventListener("pointermove", onPointerMove, true);
                 documentLike.removeEventListener("keydown", onKeyDown, true);
+                documentLike.removeEventListener("keyup", onKeyUp, true);
                 if (windowLike && windowLike.removeEventListener) {
                     windowLike.removeEventListener("popstate", refreshRoute);
                     windowLike.removeEventListener("hashchange", refreshRoute);

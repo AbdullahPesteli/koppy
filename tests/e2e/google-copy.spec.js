@@ -341,8 +341,44 @@ test("text-sized Turkcell-style PDF and AI links accept hover + Cmd+C", async ({
     await expect(page.locator("#koppy-copy-toast")).toContainText("Kopyalandı: 1080×360");
     await page.hover("#ai");
     await page.keyboard.press("Meta+C");
-    await expect.poll(() => page.evaluate(() => window.__requestedLinks)).toEqual([
+    await expect.poll(() => page.evaluate(() => window.__requestedLinks)).toEqual(expect.arrayContaining([
         "https://cdn.example.test/TURKCELL_YATAY_ERKEK_LOGO.pdf",
         "https://cdn.example.test/TURKCELL_YATAY_ERKEK_LOGO.ai",
-    ]);
+    ]));
+});
+
+test("holding Cmd previews a text-sized PDF link before copy", async ({ page }) => {
+    await page.route("https://example.test/document-preview", route => route.fulfill({
+        status: 200,
+        contentType: "text/html",
+        body: '<!doctype html><body><a id="pdf" href="https://cdn.example.test/logo.pdf">Logo (PDF)</a></body>',
+    }));
+    await page.goto("https://example.test/document-preview");
+    await page.addScriptTag({ path: modulePath });
+    await page.evaluate(() => {
+        class ClipboardItemMock { constructor(data) { this.data = data; } }
+        window.__documentPreviewController = window.KoppyGoogleCopy.createController({
+            document,
+            window,
+            location,
+            navigator: { clipboard: { async write(items) { await items[0].data["image/png"]; } } },
+            ClipboardItem: ClipboardItemMock,
+            isPreviewGesture: event => event.metaKey || event.key === "Meta",
+            requestImage: () => {
+                const canvas = document.createElement("canvas");
+                canvas.width = 200;
+                canvas.height = 100;
+                canvas.getContext("2d").fillRect(0, 0, 200, 100);
+                return { abort() {}, promise: new Promise(resolve => canvas.toBlob(blob => resolve({ blob }), "image/png")) };
+            },
+            normalizeImage: async blob => ({ blob, width: 200, height: 100 }),
+        });
+        window.__documentPreviewController.start();
+    });
+    await page.hover("#pdf");
+    await page.keyboard.down("Meta");
+    await expect(page.locator("#koppy-document-preview")).toContainText("Belge önizlemesi · ⌘C ile kopyala");
+    await expect(page.locator("#koppy-document-preview img")).toBeVisible();
+    await page.keyboard.up("Meta");
+    await expect(page.locator("#koppy-document-preview")).toBeHidden();
 });
