@@ -185,6 +185,18 @@
             panel.appendChild(previewCard);
 
             const footer = create(doc, "footer", "footer");
+            if (typeof settings.openUpdate === "function") {
+                const update = create(doc, "button", "update", "Koppy’yi güncelle  ↗");
+                update.type = "button";
+                update.addEventListener("click", event => {
+                    if (!isUserEvent(event)) return;
+                    const opened = settings.openUpdate();
+                    setStatus(opened === false
+                        ? "Güncelleme sayfası açılamadı"
+                        : "Güncelleme sayfası açıldı · Tampermonkey kurulumu doğrular", opened === false);
+                });
+                footer.appendChild(update);
+            }
             const full = create(doc, "button", "full-settings", "Tüm ayarları aç  →");
             full.type = "button";
             full.addEventListener("click", event => {
@@ -231,7 +243,7 @@
                 .key { font-size: 17px !important; font-weight: 650; } .text-button { padding: 0 6px; font-size: 11px; }
                 .position-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; } .position { position: relative; height: 38px; border: 1px solid #2a3340; border-radius: 8px; background: #0e1218; } .position:hover { border-color: #52647c; background: #171c25; } .position[aria-pressed="true"] { border-color: #6281e8; background: #202d49; } .position-dot { position: absolute; width: 7px; height: 7px; border-radius: 999px; background: #778393; } .position[aria-pressed="true"] .position-dot { background: #9db4ff; box-shadow: 0 0 0 3px rgba(124,156,255,.18); }
                 .position[data-position="top left"] .position-dot { left: 7px; top: 7px; } .position[data-position="top center"] .position-dot { left: calc(50% - 3px); top: 7px; } .position[data-position="top right"] .position-dot { right: 7px; top: 7px; } .position[data-position="bottom left"] .position-dot { left: 7px; bottom: 7px; } .position[data-position="bottom center"] .position-dot { left: calc(50% - 3px); bottom: 7px; } .position[data-position="bottom right"] .position-dot { right: 7px; bottom: 7px; }
-                .footer { padding: 10px 14px; } .full-settings { width: 100%; min-height: 34px; border: 1px solid #2a3340; border-radius: 8px; background: transparent; color: #cbd5e1; text-align: left; padding: 0 10px; } .full-settings:hover { color: #f4f7fb; border-color: #52647c; background: #171c25; }
+                .footer { display: grid; gap: 6px; padding: 10px 14px; } .full-settings, .update { width: 100%; min-height: 34px; border: 1px solid #2a3340; border-radius: 8px; background: transparent; color: #cbd5e1; text-align: left; padding: 0 10px; } .full-settings:hover, .update:hover { color: #f4f7fb; border-color: #52647c; background: #171c25; } .update { color: #b9c9ff; border-color: #40547c; background: #141b29; }
                 .status { min-height: 32px; padding: 8px 14px; border-top: 1px solid #252e3a; color: #aab4c2; background: #0e1218; font-size: 11px; } .status[data-error="true"] { color: #ff9daa; }
                 @media (max-width: 600px) { .panel { right: 8px; left: 8px; top: auto; bottom: 8px; width: auto; transform: translateY(8px) scale(.99); } .panel.open { transform: translateY(0) scale(1); } }
                 @media (prefers-reduced-motion: reduce) { .panel { transition: none; } }

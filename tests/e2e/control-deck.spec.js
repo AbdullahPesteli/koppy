@@ -32,6 +32,7 @@ test("live control deck applies a single modifier, repositions an active bar and
         window.__deck = window.KoppyControlDeck.install({
             document, window, config, prefs,
             getFloatBar: () => ({ shown: true, data: {}, setPosition() { window.__repositions += 1; } }),
+            openUpdate: () => { window.__updates = (window.__updates || 0) + 1; return true; },
         });
         window.__deck.show();
     });
@@ -40,12 +41,15 @@ test("live control deck applies a single modifier, repositions an active bar and
     const panel = host.locator(".panel");
     await expect(panel).toBeVisible();
     await expect(panel).toContainText("Canlı Kontrol");
+    await expect(panel).toContainText("Koppy’yi güncelle");
     await expect(panel).toContainText("Tüm ayarları aç");
     await host.locator('button[aria-label="Command ile önizleme"]').click();
     await expect.poll(() => page.evaluate(() => window.__deckPrefs.floatBar.globalkeys.command)).toBe(true);
     await expect.poll(() => page.evaluate(() => window.__deckPrefs.floatBar.globalkeys.ctrl)).toBe(false);
     await host.locator('button[aria-label="Sol alt"]').click();
     await expect.poll(() => page.evaluate(() => window.__repositions)).toBe(1);
+    await host.locator(".update").click();
+    await expect.poll(() => page.evaluate(() => window.__updates)).toBe(1);
 
     const box = await panel.boundingBox();
     expect(box.width).toBeLessThanOrEqual(340);

@@ -65,7 +65,7 @@ const replacements = new Map([
     ["// @name:pt-BR           Picviewer CE+", "// @name:pt-BR           Koppy"],
     ["// @name:ru              Picviewer CE+", "// @name:ru              Koppy"],
     ["// @author               NLF && ywzhaiqi && hoothin", "// @author               NLF && ywzhaiqi && hoothin; Koppy fork by pestly"],
-    ["// @version              2026.2.6.1", "// @version              0.2.7"],
+    ["// @version              2026.2.6.1", "// @version              0.2.8"],
     ["// @namespace            https://github.com/hoothin/UserScripts", "// @namespace            https://github.com/AbdullahPesteli/koppy"],
     ["// @homepage             https://pv.hoothin.com/", "// @homepage             https://github.com/AbdullahPesteli/koppy"],
     ["// @supportURL           https://github.com/hoothin/UserScripts/issues", "// @supportURL           https://github.com/AbdullahPesteli/koppy/issues"],
@@ -273,7 +273,8 @@ if (!source.includes(openPrefsSecureEntry)) throw new Error("Upstream openPrefs 
 source = source.replace(openPrefsSecureEntry, openPrefsSecureEntry
     + "\n            globalThis.KoppySettingsUI.openSecure();\n            return;");
 const integration = `${moduleSource}\n\n        globalThis.KoppyGoogleCopy.createController({\n            document: document,\n            window: window,\n            location: location,\n            navigator: navigator,\n            ClipboardItem: typeof ClipboardItem === "undefined" ? null : ClipboardItem,\n            gmRequest: _GM_xmlhttpRequest,\n            resolvePic: findPic,\n        }).start();\n        globalThis.KoppyPreviewFit.install({ ImgWindowC: ImgWindowC, prefs: prefs, window: window });\n\n`;
-const controlDeckIntegration = `        const koppyControlDeck = globalThis.KoppyControlDeck.install({
+const controlDeckIntegration = `        const koppyOpenUpdate = () => _GM_openInTab(${JSON.stringify(updateUrl)}, {active:true});
+        const koppyControlDeck = globalThis.KoppyControlDeck.install({
             config: GM_config,
             prefs: prefs,
             document: document,
@@ -281,8 +282,10 @@ const controlDeckIntegration = `        const koppyControlDeck = globalThis.Kopp
             getFloatBar: () => floatBar,
             getPreview: () => uniqueImgWin,
             openFullSettings: () => globalThis.KoppySettingsUI.openSecure(),
+            openUpdate: koppyOpenUpdate,
         });
         if (koppyControlDeck) _GM_registerMenuCommand("Koppy Canlı Kontrol", () => koppyControlDeck.toggle());
+        _GM_registerMenuCommand("Koppy · Güncellemeyi aç", koppyOpenUpdate);
 
 `;
 source = source.replace(marker, integration + controlDeckIntegration + marker);

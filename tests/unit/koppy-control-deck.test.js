@@ -83,15 +83,38 @@ test("live control deck defers to the secure full settings dialog when it is alr
     assert.equal(dom.window.document.querySelector("koppy-control-deck"), null);
 });
 
+test("live control deck exposes the update flow only when an updater is provided", () => {
+    const dom = new JSDOM("<!doctype html><html><body></body></html>");
+    const prefs = { floatBar: { position: "top right", previewMaxSizeW: 0, previewMaxSizeH: 0, globalkeys: { ctrl: false, alt: false, shift: false, command: true } } };
+    const config = makeConfig(prefs);
+    let updates = 0;
+    const deck = Deck.install({
+        document: dom.window.document,
+        window: dom.window,
+        config,
+        prefs,
+        requireTrusted: false,
+        openUpdate() { updates += 1; return true; },
+    });
+    deck.show();
+    const root = dom.window.document.querySelector("koppy-control-deck").shadowRoot;
+    root.querySelector(".update").click();
+    assert.equal(updates, 1);
+    assert.match(root.querySelector(".status").textContent, /Güncelleme sayfası açıldı/);
+});
+
 test("page-script clicks cannot change live control values", () => {
     const dom = new JSDOM("<!doctype html><html><body></body></html>");
     const prefs = { floatBar: { position: "top right", previewMaxSizeW: 0, previewMaxSizeH: 0, globalkeys: { ctrl: true, alt: false, shift: false, command: false } } };
     const config = makeConfig(prefs);
-    const deck = Deck.install({ document: dom.window.document, window: dom.window, config, prefs });
+    let updates = 0;
+    const deck = Deck.install({ document: dom.window.document, window: dom.window, config, prefs, openUpdate() { updates += 1; } });
     deck.show();
     const root = dom.window.document.querySelector("koppy-control-deck").shadowRoot;
     root.querySelector('button[aria-label="Command ile önizleme"]').click();
     assert.equal(config.saves, 0);
     assert.equal(prefs.floatBar.globalkeys.ctrl, true);
     assert.equal(prefs.floatBar.globalkeys.command, false);
+    root.querySelector(".update").click();
+    assert.equal(updates, 0);
 });

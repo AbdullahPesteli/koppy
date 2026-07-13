@@ -14,7 +14,9 @@ PNG olarak panoya kopyalar. Ayar paneli Koppy'ye özel, aranabilir ve responsive
 Orijinal ile Koppy aynı anda açık tutulmamalıdır; iki betik aynı Picviewer event'lerini kaydeder.
 
 Koppy'nin `@updateURL` ve `@downloadURL` alanları aynı yayın adresine bağlıdır. İlk kurulumdan sonra
-**Automatic installation** açık olduğunda yeni sürüm için yeniden dosya yüklemek gerekmez.
+**Automatic installation** açık olduğunda yeni sürüm için yeniden dosya yüklemek gerekmez. Acil bir sürüm
+gerekirse Tampermonkey'nin pinlenmiş menüsündeki **Koppy · Güncellemeyi aç** ya da Canlı Kontrol panelindeki
+**Koppy’yi güncelle** düğmesi, doğru kurulum sayfasını doğrudan açar.
 
 ## Geliştirme
 
