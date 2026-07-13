@@ -1,7 +1,7 @@
 # Koppy
 
 Koppy, MIT lisanslı Picviewer CE+ kullanıcı betiğinin kişisel fork'udur. Mevcut Picviewer
-özelliklerini korur; Google Görseller'de hover edilen orijinal resmi `Cmd+C` ile URL yerine gerçek
+özelliklerini korur; QuickHover'ın bulduğu veya ekranda görünen görseli `Cmd+C` ile URL yerine gerçek
 PNG olarak panoya kopyalar. Ayar paneli Koppy'ye özel, aranabilir ve responsive'tir.
 
 ## Kurulum
@@ -28,19 +28,18 @@ bilerek git'te tutulur: Tampermonkey her sürümde buradan güncelleme alır.
 
 ## Kullanım
 
-Google Görseller (`tbm=isch` veya `udm=2`) sonucunun üzerinde bekleyip `Cmd+C` yap. Koppy ulaşılabilen
-orijinal URL'yi indirir, resmi standart `image/png` clipboard biçimine dönüştürür ve çözünürlüğü kısa
-bir bildirimde gösterir. Metin seçiliyken veya input/textarea/contenteditable alanındayken normal
-kopyalama davranışı korunur.
+Wikipedia dahil desteklenen herhangi bir sitede görselin üzerinde bekleyip `Cmd+C` yap. Koppy önce
+QuickHover/Picviewer'ın çözdüğü daha iyi URL'yi, yoksa ekranda görünen görselin URL'sini kullanır;
+çıktıyı standart `image/png` clipboard biçimine dönüştürür. Kopyalama sırasında görselin üzerinde ince
+bir ilerleme çizgisi, sonunda da çözünürlüklü kısa “Kopyalandı” bilgisi görünür. Metin seçiliyken veya
+input/textarea/contenteditable alanındayken normal kopyalama davranışı korunur.
 
-Hover yalnız URL adayını çözer; gizlilik, SSRF ve bellek riski nedeniyle ağ/decode işlemi `Cmd+C` öncesinde
-başlatılmaz. Koppy yalnız `https:` görselleri kabul eder; literal localhost/private ağ hedeflerini,
-yönlendirmeleri, raster olmayan yanıtları, 80 MB üzerindeki indirmeleri ve güvenli piksel/dimension sınırını
-aşan görselleri reddeder. İstekler anonim ve 20 saniye timeout ile yapılır. Tampermonkey katmanında DNS
-çözümünü güvenilir biçimde pinlemek mümkün olmadığından DNS-rebinding riski bütünüyle sıfırlanamaz; ağın
-yalnız gerçek kullanıcı `Cmd+C` hareketinde başlaması bu yüzeyi daraltır. Faz 1 raster kapsamı PNG, JPEG
-ve WebP'dir; GIF/AVIF kaynakları açık “desteklenmeyen tür” hatasıyla reddedilir. Google hostname kapsamı
-kişisel hedefe göre `google.com` ve `google.com.tr` ile sınırlıdır.
+Hover yalnız URL adayını çözer; ağ/decode işlemi `Cmd+C` öncesinde başlamaz. Koppy yalnız `https:`
+görselleri kabul eder; localhost/private ağ hedeflerini, yönlendirmeleri, raster olmayan yanıtları, 80 MB
+üzerindeki indirmeleri ve güvenli piksel/dimension sınırını aşan görselleri reddeder. İstekler anonim ve
+20 saniye timeout ile yapılır. Google Görseller'de gstatic thumbnail'ı hiçbir zaman “orijinal” diye
+kopyalanmaz; gerçek aday yoksa açık hata gösterilir. PNG, JPEG ve WebP desteklenir; GIF/AVIF kaynakları
+“desteklenmeyen tür” hatasıyla reddedilir.
 
 Tampermonkey menüsündeki Koppy ayarları; beş kategori, global ayar araması, sabit kaydetme çubuğu ve
 dar pencerede yatay kategori navigasyonu kullanır. Mevcut 91 Picviewer ayarı ve kayıtlı değerleri aynı
@@ -49,7 +48,8 @@ ayrılır; kayıt paketleri özel MessageChannel'da alan tipi/seçenek/uzunluk a
 read-back başarılı olmadan panel kapanmaz. Aria2 token renderer şemasına düz metin olarak gönderilmez;
 boş bırakılırsa kayıtlı değer korunur, yalnız açık sıfırlama veya yeni değer girişiyle değişir.
 Google'ın CSP nonce'u sandbox renderer'ına taşınır; panel dışındaki karartılmış alana tıklamak, kaydedilmemiş
-değişiklik yoksa ayarları kapatır.
+değişiklik yoksa ayarları kapatır. **Önizleme boyutu** alanları boşsa QuickHover önizlemesi ekranı kaplamaz;
+yaklaşık ekranın %72'sine sığar. Alanlara elle ölçü yazılırsa o ölçüler önceliklidir.
 
 Güvenlik nedeniyle özel site kuralları artık yalnız geçerli bir JSON dizisi olabilir. Eski JavaScript/eval
 biçimli custom rule'lar çalıştırılmaz; gerekiyorsa deklaratif JSON biçimine dönüştürülmelidir.

@@ -41,7 +41,10 @@ Koppy, görsel işi sırasında arka planda güvenilir kalan kişisel bir araçt
 - Vazgeç ve global reset, değişiklik kaybı yaratacaksa ikinci basışla onaylanır.
 - Boolean alanlar switch görünümündedir; metin, sayı, seçim ve kod alanları aynı focus sistemini kullanır.
 - Önizleme etkinleştirme tuşu tek seçimlidir; `⌘ Cmd` seçildiğinde `Ctrl` otomatik kapanır. Bu ayar,
-  Google Görseller'de gerçek görsel kopyalayan `⌘C` kısayolundan ayrıdır.
+  gerçek görsel kopyalayan `⌘C` kısayolundan ayrıdır. Ölçü boşsa QuickHover önizlemesi ekranın yaklaşık
+  %72'sine sığar; kullanıcı ölçü girerse bu sınır aynen uygulanır.
+- `⌘C` sırasında görselin alt kenarında ince, sakin bir ilerleme çizgisi görünür; başarıda kısa süre
+  `Kopyalandı · genişlik×yükseklik` metnine dönüşür. Sayfa altındaki toast hata ve erişilebilirlik yedeğidir.
 - Arama bütün kategorileri tarar; sonuç sayısı veya açık boş-sonuç mesajı gösterilir.
 - Arama, kapalı bir İnce ayar içindeki eşleşmeyi bulursa ilgili bölümü açar.
 - Hareketler `prefers-reduced-motion` altında kapatılır.

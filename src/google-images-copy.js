@@ -246,6 +246,38 @@
         return resolveGoogleImageCandidates(element, options)[0] || null;
     }
 
+    function resolveQuickHoverImageCandidates(element, options) {
+        const settings = options || {};
+        if (!element || String(element.nodeName).toUpperCase() !== "IMG") return [];
+        const baseUrl = settings.baseUrl || (element.ownerDocument && element.ownerDocument.baseURI) || "https://example.invalid/";
+        const candidates = [];
+        const seen = new Set();
+        const add = (url, source) => {
+            const normalized = normalizeCandidateUrl(url, baseUrl);
+            if (!normalized || seen.has(normalized)) return;
+            seen.add(normalized);
+            candidates.push({ url: normalized, element, source });
+        };
+
+        // Picviewer already knows how to resolve many site-specific previews. Prefer that
+        // answer, but do not require a site rule: the visible image remains a safe fallback.
+        if (typeof settings.resolvePic === "function") {
+            try {
+                const resolved = settings.resolvePic(element) || {};
+                add(resolved.src, "quickhover:" + (resolved.type || "resolved"));
+                if (Array.isArray(resolved.srcs)) resolved.srcs.forEach(url => add(url, "quickhover-srcs"));
+                add(resolved.imgSrc, "quickhover-visible");
+            } catch (_) {}
+        }
+
+        const fromAttributes = imageUrlFromAttributes(element, baseUrl);
+        if (fromAttributes) add(fromAttributes.url, fromAttributes.source);
+        parseSrcset(element.getAttribute && element.getAttribute("srcset"), baseUrl).forEach(candidate => add(candidate.url, "srcset"));
+        add(element.currentSrc, "currentSrc");
+        add(element.src || (element.getAttribute && element.getAttribute("src")), "src");
+        return candidates;
+    }
+
     function parseResponseHeaders(rawHeaders) {
         const headers = Object.create(null);
         String(rawHeaders || "").split(/\r?\n/).forEach(line => {
@@ -260,6 +292,7 @@
         const settings = options || {};
         const maxBytes = settings.maxBytes || MAX_IMAGE_BYTES;
         const timeout = settings.timeout || REQUEST_TIMEOUT_MS;
+        const onProgress = typeof settings.onProgress === "function" ? settings.onProgress : null;
         const safeUrl = normalizeCandidateUrl(url, "https://www.google.com/");
         if (!safeUrl) {
             return {
@@ -284,6 +317,7 @@
                 redirect: "error",
                 timeout,
                 onprogress(progress) {
+                    if (onProgress) onProgress(progress);
                     if (Number(progress.loaded || 0) <= maxBytes && (!progress.lengthComputable || Number(progress.total || 0) <= maxBytes)) return;
                     fail(new Error("Görsel " + Math.round(maxBytes / 1024 / 1024) + " MB güvenlik sınırını aşıyor"));
                     if (requestHandle && typeof requestHandle.abort === "function") requestHandle.abort();
@@ -490,6 +524,86 @@
         };
     }
 
+    function createCopyFeedback(documentLike, windowLike) {
+        let timer;
+        let indicator;
+        const doc = documentLike;
+        const win = windowLike || (doc && doc.defaultView);
+
+        function ensure() {
+            if (!doc || !doc.documentElement) return null;
+            if (indicator) return indicator;
+            const root = doc.createElement("div");
+            root.id = "koppy-copy-feedback";
+            root.setAttribute("aria-live", "polite");
+            root.setAttribute("aria-atomic", "true");
+            Object.assign(root.style, {
+                position: "fixed", display: "none", pointerEvents: "none", zIndex: "2147483647",
+                height: "3px", borderRadius: "999px", overflow: "visible",
+                background: "rgba(8, 14, 23, .64)", boxShadow: "0 1px 8px rgba(0,0,0,.28)",
+            });
+            const fill = doc.createElement("div");
+            fill.className = "koppy-copy-feedback-fill";
+            Object.assign(fill.style, {
+                width: "0%", height: "100%", borderRadius: "inherit", background: "#7c9cff",
+                transition: "width 160ms ease, background-color 160ms ease",
+            });
+            const label = doc.createElement("span");
+            label.className = "koppy-copy-feedback-label";
+            Object.assign(label.style, {
+                position: "absolute", left: "0", bottom: "8px", whiteSpace: "nowrap",
+                padding: "4px 7px", borderRadius: "6px", color: "#f4f7fb",
+                background: "rgba(11, 14, 19, .86)", font: "600 11px/1.2 -apple-system, BlinkMacSystemFont, sans-serif",
+                letterSpacing: ".01em", boxShadow: "0 3px 12px rgba(0,0,0,.22)",
+            });
+            root.append(fill, label);
+            doc.documentElement.appendChild(root);
+            indicator = { root, fill, label, element: null };
+            return indicator;
+        }
+
+        function place(element) {
+            const item = ensure();
+            if (!item || !element || typeof element.getBoundingClientRect !== "function") return null;
+            const rect = element.getBoundingClientRect();
+            if (!rect || rect.width < 1 || rect.height < 1) return null;
+            const viewportWidth = Number(win && win.innerWidth || 0);
+            const left = Math.max(4, Math.min(rect.left, Math.max(4, viewportWidth - 12)));
+            const width = Math.max(20, Math.min(rect.width, Math.max(20, viewportWidth - left - 4)));
+            Object.assign(item.root.style, {
+                left: Math.round(left) + "px",
+                top: Math.round(Math.max(4, rect.bottom - 4)) + "px",
+                width: Math.round(width) + "px",
+            });
+            item.element = element;
+            return item;
+        }
+
+        function show(element, label, percent, kind) {
+            const item = place(element);
+            if (!item) return;
+            clearTimeout(timer);
+            item.label.textContent = label;
+            item.root.style.display = "block";
+            item.fill.style.background = kind === "error" ? "#ff7185" : kind === "success" ? "#62cf91" : "#7c9cff";
+            item.fill.style.width = Math.max(0, Math.min(100, Number(percent) || 0)) + "%";
+        }
+
+        return {
+            start(element) { show(element, "Kopyalanıyor", 12, "progress"); },
+            progress(element, fraction) { show(element, "Kopyalanıyor", 12 + Math.max(0, Math.min(1, Number(fraction) || 0)) * 76, "progress"); },
+            decoding(element) { show(element, "Panoya hazırlanıyor", 92, "progress"); },
+            complete(element, width, height) {
+                show(element, "Kopyalandı · " + width + "×" + height, 100, "success");
+                timer = setTimeout(() => { if (indicator) indicator.root.style.display = "none"; }, 1500);
+            },
+            fail(element, message) {
+                show(element, message || "Kopyalanamadı", 100, "error");
+                timer = setTimeout(() => { if (indicator) indicator.root.style.display = "none"; }, 2400);
+            },
+        };
+    }
+
     async function prepareClipboardImage(candidate, options) {
         const settings = options || {};
         if (!candidate || !candidate.url) throw new Error("Orijinal görsel adresi bulunamadı");
@@ -511,6 +625,7 @@
         const navigatorLike = deps.navigator || (windowLike && windowLike.navigator);
         const ClipboardItemCtor = deps.ClipboardItem || (windowLike && windowLike.ClipboardItem);
         const notify = deps.notify || createToast(documentLike);
+        const feedback = deps.feedback || createCopyFeedback(documentLike, windowLike);
         const normalizeImage = deps.normalizeImage || (blob => normalizeImageToPng(blob, {
             createImageBitmap: windowLike && windowLike.createImageBitmap && windowLike.createImageBitmap.bind(windowLike),
             OffscreenCanvas: windowLike && windowLike.OffscreenCanvas,
@@ -519,9 +634,10 @@
             maxPixels: deps.maxPixels || MAX_IMAGE_PIXELS,
             maxDimension: deps.maxDimension || MAX_IMAGE_DIMENSION,
         }));
-        const requestImage = deps.requestImage || (url => requestImageWithGM(url, deps.gmRequest, {
+        const requestImage = deps.requestImage || ((url, onProgress) => requestImageWithGM(url, deps.gmRequest, {
             maxBytes: deps.maxBytes || MAX_IMAGE_BYTES,
             timeout: deps.timeout || REQUEST_TIMEOUT_MS,
+            onProgress,
         }));
         let current = null;
         let activeCopy = null;
@@ -547,6 +663,12 @@
         }
 
         function resolveCandidates(image) {
+            if (!isGoogleImagesLocation(locationLike)) {
+                return resolveQuickHoverImageCandidates(image, {
+                    resolvePic: deps.resolvePic,
+                    baseUrl: locationLike && locationLike.href,
+                });
+            }
             return resolveGoogleImageCandidates(image, {
                 resolvePic: deps.resolvePic,
                 baseUrl: locationLike && locationLike.href,
@@ -555,7 +677,7 @@
         }
 
         function setHoveredImage(image, force) {
-            if (!isGoogleImagesLocation(locationLike) || !isLikelyResultImage(image)) {
+            if (!isLikelyResultImage(image)) {
                 cancelCurrent();
                 return;
             }
@@ -572,7 +694,7 @@
                 activeRequest: null,
                 cancelled: false,
                 copying: false,
-                isGoogleResult: isGoogleResultImage(image),
+                isGoogleResult: isGoogleImagesLocation(locationLike) && isGoogleResultImage(image),
             };
         }
 
@@ -608,16 +730,10 @@
             });
         }
 
-        function refreshRoute() {
-            if (!isGoogleImagesLocation(locationLike)) cancelAll();
-        }
+        function refreshRoute() { cancelAll(); }
 
         function onPointerMove(event) {
             lastPointer = { x: event.clientX, y: event.clientY };
-            if (!isGoogleImagesLocation(locationLike)) {
-                cancelCurrent();
-                return;
-            }
             const image = imageAtPointer(event);
             if (image) setHoveredImage(image, false);
             else if (!pointerInsideCurrent()) cancelCurrent();
@@ -628,11 +744,15 @@
             for (const candidate of state.candidates) {
                 if (state.cancelled) throw new Error("Görsel hazırlama iptal edildi");
                 try {
-                    const request = requestImage(candidate.url);
+                    const request = requestImage(candidate.url, progress => {
+                        if (!progress || !progress.lengthComputable || !progress.total) return;
+                        feedback.progress(state.element, Number(progress.loaded || 0) / Number(progress.total));
+                    });
                     state.activeRequest = request;
                     const downloaded = await request.promise;
                     state.activeRequest = null;
                     if (state.cancelled) throw new Error("Görsel hazırlama iptal edildi");
+                    feedback.decoding(state.element);
                     const prepared = await normalizeImage(downloaded.blob);
                     if (state.cancelled) throw new Error("Görsel hazırlama iptal edildi");
                     return Object.assign({ source: candidate.source }, prepared);
@@ -646,7 +766,7 @@
         }
 
         async function copyHoveredImage(event) {
-            if (!isGoogleImagesLocation(locationLike) || !isCopyGesture(event, windowLike)) {
+            if (!isCopyGesture(event, windowLike)) {
                 return { status: "not-applicable" };
             }
             // Google can replace or move a result without another pointer event. Re-read the
@@ -689,6 +809,7 @@
                 cancelled: false,
             };
             activeCopy = copyState;
+            feedback.start(copyState.element);
             notify("Koppy: Görsel hazırlanıyor…", "progress");
             const preparedPromise = prepareFromCandidates(copyState);
             try {
@@ -698,11 +819,13 @@
                     new ClipboardItemCtor({ "image/png": clipboardBlobPromise }),
                 ]));
                 const [prepared] = await Promise.all([preparedPromise, writePromise]);
+                feedback.complete(copyState.element, prepared.width, prepared.height);
                 notify("Kopyalandı: " + prepared.width + "×" + prepared.height, "success");
                 return { status: "copied", width: prepared.width, height: prepared.height, source: prepared.source };
             } catch (error) {
                 cancelState(copyState);
                 const message = error && error.message ? error.message : "Bilinmeyen hata";
+                feedback.fail(copyState.element, "Kopyalanamadı");
                 notify("Koppy: " + message, "error");
                 return { status: "failed", reason: message };
             } finally {
@@ -717,7 +840,7 @@
 
         return {
             start() {
-                if (started || !documentLike || !isGoogleHostname(locationLike && locationLike.hostname)) return false;
+                if (started || !documentLike) return false;
                 if (windowLike && windowLike.top && windowLike.self && windowLike.top !== windowLike.self) return false;
                 documentLike.addEventListener("pointermove", onPointerMove, true);
                 documentLike.addEventListener("keydown", onKeyDown, true);
@@ -759,6 +882,7 @@
         MAX_IMAGE_DIMENSION,
         MAX_IMAGE_PIXELS,
         createController,
+        createCopyFeedback,
         createToast,
         isCopyGesture,
         isGoogleImagesLocation,
@@ -773,5 +897,6 @@
         requestImageWithGM,
         resolveGoogleImage,
         resolveGoogleImageCandidates,
+        resolveQuickHoverImageCandidates,
     };
 });

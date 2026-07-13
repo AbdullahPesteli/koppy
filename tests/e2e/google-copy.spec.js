@@ -76,6 +76,7 @@ test("hover + Cmd+C writes one 320×180 PNG and preserves input copy", async ({ 
     })).toBe("https://images.example.test/original.jpg");
     expect(await page.evaluate(() => window.__requestCount)).toBe(0);
     await page.keyboard.press("Meta+C");
+    await expect(page.locator("#koppy-copy-feedback")).toContainText("Kopyalandı · 320×180");
     await expect(page.locator("#koppy-copy-toast")).toContainText("Kopyalandı: 320×180");
 
     const clipboard = await page.evaluate(async () => {
@@ -185,4 +186,61 @@ test("built Koppy userscript boots with Tampermonkey-shaped grants and resolves 
         return result;
     });
     expect(clipboard).toEqual({ count: 1, types: ["image/png"], width: 640, height: 360 });
+});
+
+test("built Koppy userscript copies a visible QuickHover image on Wikipedia", async ({ page }) => {
+    await page.route("https://en.wikipedia.org/wiki/Example", route => route.fulfill({
+        status: 200,
+        contentType: "text/html",
+        body: `<!doctype html><html><body><img id="wiki-image" width="360" height="240" alt="Example" src="https://upload.wikimedia.org/wikipedia/en/a/a9/Example.jpg"></body></html>`,
+    }));
+    await page.goto("https://en.wikipedia.org/wiki/Example");
+    await page.evaluate(() => {
+        const values = new Map();
+        window.GM_getValue = (key, fallback) => values.has(key) ? values.get(key) : fallback;
+        window.GM_setValue = (key, value) => values.set(key, value);
+        window.GM_deleteValue = key => values.delete(key);
+        window.GM_addStyle = css => { const style = document.createElement("style"); style.textContent = css; document.head.appendChild(style); return style; };
+        window.GM_openInTab = () => null;
+        window.GM_setClipboard = () => {};
+        window.GM_registerMenuCommand = () => {};
+        window.GM_notification = () => {};
+        window.GM_download = () => {};
+        window.GM_xmlhttpRequest = options => {
+            const canvas = document.createElement("canvas");
+            canvas.width = 360;
+            canvas.height = 240;
+            canvas.getContext("2d").fillRect(0, 0, 360, 240);
+            canvas.toBlob(blob => options.onload({ status: 200, response: blob, finalUrl: options.url, responseHeaders: "Content-Type: image/png" }), "image/png");
+            return { abort() {} };
+        };
+        window.GM = {
+            getValue: async (key, fallback) => window.GM_getValue(key, fallback),
+            setValue: async (key, value) => window.GM_setValue(key, value),
+            deleteValue: async key => window.GM_deleteValue(key),
+            addStyle: window.GM_addStyle,
+            openInTab: window.GM_openInTab,
+            setClipboard: window.GM_setClipboard,
+            registerMenuCommand: window.GM_registerMenuCommand,
+            notification: window.GM_notification,
+            xmlHttpRequest: window.GM_xmlhttpRequest,
+        };
+        window.unsafeWindow = window;
+    });
+    const built = fs.readFileSync(distPath, "utf8");
+    expect(await page.evaluate(source => {
+        try { new Function(source).call(window); return null; } catch (error) { return String(error && error.stack || error); }
+    }, built)).toBeNull();
+    await page.hover("#wiki-image");
+    await page.keyboard.press("Meta+C");
+    await expect(page.locator("#koppy-copy-feedback")).toContainText("Kopyalandı · 360×240");
+    const clipboard = await page.evaluate(async () => {
+        const items = await navigator.clipboard.read();
+        const blob = await items[0].getType("image/png");
+        const bitmap = await createImageBitmap(blob);
+        const result = { count: items.length, types: items[0].types, width: bitmap.width, height: bitmap.height };
+        bitmap.close();
+        return result;
+    });
+    expect(clipboard).toEqual({ count: 1, types: ["image/png"], width: 360, height: 240 });
 });

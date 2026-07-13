@@ -72,6 +72,62 @@ test("Picviewer result wins, then udm=2 data and highest srcset are used", () =>
     assert.equal(viaSrcset.source, "srcset");
 });
 
+test("QuickHover resolves any site's original first and falls back to the visible image", () => {
+    const dom = new JSDOM(`<!doctype html><img id="wiki-image" width="320" height="200" src="https://upload.wikimedia.org/thumb.jpg">`, {
+        url: "https://en.wikipedia.org/wiki/Example",
+    });
+    const image = makeVisible(dom.window.document.getElementById("wiki-image"), 320, 200);
+    const resolved = Koppy.resolveQuickHoverImageCandidates(image, {
+        baseUrl: dom.window.location.href,
+        resolvePic: () => ({ src: "https://upload.wikimedia.org/original.png", imgSrc: image.src, type: "rule" }),
+    });
+    assert.equal(resolved[0].url, "https://upload.wikimedia.org/original.png");
+    assert.equal(resolved[0].source, "quickhover:rule");
+    assert.equal(Koppy.resolveQuickHoverImageCandidates(image, { baseUrl: dom.window.location.href })[0].url, image.src);
+});
+
+test("Cmd+C copies a QuickHover image on a non-Google site and reports on-image progress", async () => {
+    const dom = new JSDOM(`<!doctype html><img id="wiki-image" width="320" height="200" src="https://upload.wikimedia.org/thumb.jpg">`, {
+        url: "https://en.wikipedia.org/wiki/Example",
+    });
+    const document = dom.window.document;
+    const image = makeVisible(document.getElementById("wiki-image"), 320, 200);
+    const feedback = [];
+    const requested = [];
+    class ClipboardItemMock { constructor(data) { this.data = data; } }
+    const controller = Koppy.createController({
+        document,
+        window: dom.window,
+        location: dom.window.location,
+        navigator: { clipboard: { async write(items) { await items[0].data["image/png"]; } } },
+        ClipboardItem: ClipboardItemMock,
+        notify() {},
+        feedback: {
+            start: element => feedback.push(["start", element]),
+            progress: () => feedback.push(["progress"]),
+            decoding: () => feedback.push(["decoding"]),
+            complete: (_element, width, height) => feedback.push(["complete", width, height]),
+            fail: () => feedback.push(["fail"]),
+        },
+        resolvePic: () => ({ src: "https://upload.wikimedia.org/original.png", type: "rule" }),
+        requestImage: url => {
+            requested.push(url);
+            return { promise: Promise.resolve({ blob: new Blob(["image"], { type: "image/png" }) }), abort() {} };
+        },
+        normalizeImage: async blob => ({ blob, width: 2048, height: 1365 }),
+    });
+    assert.equal(controller.start(), true);
+    controller.setHoveredImage(image);
+    const result = await controller.copyHoveredImage({
+        key: "c", metaKey: true, target: document.body,
+        preventDefault() {}, stopImmediatePropagation() {},
+    });
+    assert.equal(result.status, "copied");
+    assert.deepEqual(requested, ["https://upload.wikimedia.org/original.png"]);
+    assert.deepEqual(feedback.map(entry => entry[0]), ["start", "decoding", "complete"]);
+    assert.deepEqual(feedback.at(-1), ["complete", 2048, 1365]);
+});
+
 test("current udm=2 docid metadata resolves original URL and never falls back to bare thumbnail src", () => {
     const dom = domFrom("google-udm2-current.html", "https://www.google.com/search?q=vmaf&udm=2");
     const image = makeVisible(dom.window.document.getElementById("current-udm2-image"));
@@ -389,19 +445,18 @@ test("a Google thumbnail without an original candidate is blocked instead of bec
     assert.match(notices.at(-1).message, /Orijinal görsel adresi bulunamadı/);
 });
 
-test("controller follows Google SPA route entry and exit", () => {
+test("controller clears its hover candidate on SPA route changes", () => {
     const dom = domFrom("google-tbm.html", "https://www.google.com/search?q=cat&tbm=isch");
     const image = makeVisible(dom.window.document.getElementById("legacy-image"));
     const location = { hostname: "www.google.com", pathname: "/search", search: "?q=cat", href: "https://www.google.com/search?q=cat" };
     const controller = Koppy.createController({ document: dom.window.document, window: dom.window, location, notify() {} });
     assert.equal(controller.start(), true);
     controller.setHoveredImage(image);
-    assert.equal(controller.getState(), null);
+    assert.ok(controller.getState());
     location.search = "?q=cat&udm=2";
     location.href += "&udm=2";
     controller.setHoveredImage(image);
     assert.ok(controller.getState());
-    location.search = "?q=cat";
     controller.refreshRoute();
     assert.equal(controller.getState(), null);
     controller.destroy();

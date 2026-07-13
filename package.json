@@ -1,6 +1,6 @@
 {
   "name": "koppy",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Koppy: Google Images direct-image clipboard fork of Picviewer CE+ for Tampermonkey",
   "license": "MIT",
   "repository": {
