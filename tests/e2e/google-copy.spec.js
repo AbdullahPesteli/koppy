@@ -382,3 +382,45 @@ test("holding Cmd previews a text-sized PDF link before copy", async ({ page }) 
     await page.keyboard.up("Meta");
     await expect(page.locator("#koppy-document-preview")).toBeHidden();
 });
+
+test("built Koppy uses the native Picviewer preview shell for a document link", async ({ page }) => {
+    await page.route("https://example.test/native-document-preview", route => route.fulfill({
+        status: 200,
+        contentType: "text/html",
+        body: '<!doctype html><body><a id="pdf" href="https://cdn.example.test/logo.pdf">Logo (PDF)</a></body>',
+    }));
+    await page.goto("https://example.test/native-document-preview");
+    await page.evaluate(() => {
+        window.GM_getValue = (_key, fallback) => fallback;
+        window.GM_setValue = () => {};
+        window.GM_deleteValue = () => {};
+        window.GM_addStyle = css => { const style = document.createElement("style"); style.textContent = css; document.head.appendChild(style); return style; };
+        window.GM_openInTab = () => null;
+        window.GM_setClipboard = () => {};
+        window.GM_registerMenuCommand = () => {};
+        window.GM_notification = () => {};
+        window.GM_download = () => {};
+        window.GM_xmlhttpRequest = options => {
+            const canvas = document.createElement("canvas");
+            canvas.width = 200;
+            canvas.height = 100;
+            canvas.getContext("2d").fillRect(0, 0, 200, 100);
+            canvas.toBlob(blob => options.onload({ status: 200, response: blob, finalUrl: options.url, responseHeaders: "Content-Type: image/png" }), "image/png");
+            return { abort() {} };
+        };
+        window.GM = { getValue: async (_key, fallback) => fallback, setValue: async () => {}, deleteValue: async () => {}, addStyle: window.GM_addStyle, openInTab: window.GM_openInTab, setClipboard: window.GM_setClipboard, registerMenuCommand: window.GM_registerMenuCommand, notification: window.GM_notification, xmlHttpRequest: window.GM_xmlhttpRequest };
+        window.unsafeWindow = window;
+    });
+    const built = fs.readFileSync(distPath, "utf8");
+    expect(await page.evaluate(source => {
+        try { new Function(source).call(window); return null; } catch (error) { return String(error && error.stack || error); }
+    }, built)).toBeNull();
+    await page.hover("#pdf");
+    await page.keyboard.down("Control");
+    const nativePreview = page.locator(".pv-pic-window-container.preview[data-koppy-document-preview='true']");
+    await expect(nativePreview).toBeVisible();
+    await expect(nativePreview.locator(".pv-pic-window-imgbox img")).toBeVisible();
+    await expect(page.locator("#koppy-document-preview")).toHaveCount(0);
+    await page.keyboard.up("Control");
+    await expect(nativePreview).toBeHidden();
+});

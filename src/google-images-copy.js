@@ -1123,6 +1123,9 @@
         function closeDocumentPreview() {
             if (activePreview) cancelState(activePreview);
             activePreview = null;
+            if (typeof deps.hideDocumentPreview === "function") {
+                try { deps.hideDocumentPreview(); } catch (_) {}
+            }
             if (!documentPreview) return;
             if (documentPreview.objectUrl && windowLike && windowLike.URL && typeof windowLike.URL.revokeObjectURL === "function") {
                 windowLike.URL.revokeObjectURL(documentPreview.objectUrl);
@@ -1135,8 +1138,6 @@
 
         async function previewHoveredDocument() {
             if (!current || !current.candidates.length || !isDocumentSurface(current.element) || activePreview) return;
-            const preview = ensureDocumentPreview();
-            if (!preview) return;
             const state = {
                 element: current.element,
                 candidates: current.candidates.slice(),
@@ -1144,10 +1145,14 @@
                 cancelled: false,
             };
             activePreview = state;
-            preview.image.style.display = "none";
-            preview.label.textContent = "Belge önizlemesi hazırlanıyor…";
-            preview.root.style.display = "block";
-            placeDocumentPreview(preview);
+            const nativePreview = typeof deps.showDocumentPreview === "function";
+            const preview = nativePreview ? null : ensureDocumentPreview();
+            if (preview) {
+                preview.image.style.display = "none";
+                preview.label.textContent = "Belge önizlemesi hazırlanıyor…";
+                preview.root.style.display = "block";
+                placeDocumentPreview(preview);
+            }
             let lastError = null;
             try {
                 for (const candidate of state.candidates) {
@@ -1160,6 +1165,12 @@
                         if (state.cancelled) return;
                         const prepared = await normalizeImage(downloaded.blob);
                         if (state.cancelled) return;
+                        if (nativePreview) {
+                            try {
+                                if (deps.showDocumentPreview({ blob: prepared.blob, element: state.element, pointer: lastPointer })) return;
+                            } catch (_) {}
+                        }
+                        if (!preview) throw new Error("Tarayıcı belge önizlemesini desteklemiyor");
                         const objectUrl = windowLike && windowLike.URL && typeof windowLike.URL.createObjectURL === "function"
                             ? windowLike.URL.createObjectURL(prepared.blob) : null;
                         if (!objectUrl) throw new Error("Tarayıcı belge önizlemesini desteklemiyor");
