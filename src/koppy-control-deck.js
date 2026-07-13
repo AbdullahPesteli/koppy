@@ -64,6 +64,16 @@
         let statusError = false;
         let isPinned = false;
         let drag;
+        let stackState = typeof settings.getStackState === "function"
+            ? settings.getStackState()
+            : { enabled: false, count: 0, bytes: 0, maxItems: 10, maxBytes: 150 * 1024 * 1024 };
+
+        if (typeof settings.onStackChange === "function") {
+            settings.onStackChange(nextState => {
+                stackState = nextState || stackState;
+                if (isOpen) render();
+            });
+        }
 
         function isUserEvent(event) {
             return settings.requireTrusted === false || Boolean(event && event.isTrusted);
@@ -113,6 +123,40 @@
             title.append(create(doc, "span", "mark", "K"), create(doc, "div", "title-copy"));
             title.lastChild.append(create(doc, "strong", "", "Canlı Kontrol"), create(doc, "small", "", "değişiklikler anında kaydolur"));
             title.addEventListener("pointerdown", beginDrag);
+            const stackToggle = typeof settings.setStackEnabled === "function"
+                ? create(doc, "button", "stack-toggle", stackState.enabled ? "Stack " + stackState.count : "Stack")
+                : null;
+            if (stackToggle) {
+                stackToggle.type = "button";
+                stackToggle.setAttribute("aria-pressed", String(stackState.enabled));
+                stackToggle.setAttribute("aria-label", stackState.enabled
+                    ? "Görsel Stack açık, " + stackState.count + " görsel birikti"
+                    : "Görsel Stack kapalı");
+                stackToggle.title = stackState.enabled
+                    ? "Stack açık: Cmd+C normal panoya ve geçici listeye ekler"
+                    : "Stack kapalı: Cmd+C yalnız normal panoya kopyalar";
+                stackToggle.addEventListener("click", event => {
+                    if (!isUserEvent(event)) return;
+                    const next = settings.setStackEnabled(!stackState.enabled) || stackState;
+                    stackState = next;
+                    setStatus(next.enabled ? "Stack açık · normal Cmd+C de devam eder" : "Stack kapalı · normal kopya değişmedi");
+                    render();
+                });
+            }
+            const stackClear = stackState.count && typeof settings.clearStack === "function"
+                ? create(doc, "button", "stack-clear", "×")
+                : null;
+            if (stackClear) {
+                stackClear.type = "button";
+                stackClear.title = "Stack’i temizle; sistem panosuna dokunmaz";
+                stackClear.setAttribute("aria-label", "Stack’i temizle; sistem panosuna dokunmaz");
+                stackClear.addEventListener("click", event => {
+                    if (!isUserEvent(event)) return;
+                    stackState = settings.clearStack() || stackState;
+                    setStatus("Stack temizlendi · pano aynen korundu");
+                    render();
+                });
+            }
             const pin = create(doc, "button", "pin", isPinned ? "Sabit" : "Sabitle");
             pin.type = "button";
             pin.title = isPinned ? "Sabitlemeyi kaldır" : "Paneli sabitle";
@@ -131,7 +175,7 @@
             close.title = "Kapat";
             close.setAttribute("aria-label", "Canlı kontrolü kapat");
             close.addEventListener("click", hide);
-            header.append(title, pin, close);
+            header.append(title, ...(stackToggle ? [stackToggle] : []), ...(stackClear ? [stackClear] : []), pin, close);
             panel.appendChild(header);
 
             const modifierCard = card("Önizleme tuşu", "Sadece biri aktif olabilir.");
@@ -253,7 +297,7 @@
                 .title { display: flex; min-width: 0; margin-right: auto; align-items: center; gap: 10px; cursor: grab; user-select: none; touch-action: none; } .panel.dragging .title { cursor: grabbing; }
                 .mark { width: 28px; height: 28px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 8px; color: #081021; background: ${ACCENT}; font-weight: 800; }
                 .title-copy { display: grid; gap: 1px; } .title-copy strong { font-size: 14px; } .title-copy small { color: #aab4c2; font-size: 11px; }
-                button { appearance: none; font: inherit; color: inherit; cursor: pointer; } .icon { width: 30px; height: 30px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #aab4c2; font-size: 22px; line-height: 1; } .icon:hover { background: #171c25; border-color: #2a3340; color: #f4f7fb; } .pin { min-width: 55px; height: 30px; margin-right: 4px; padding: 0 7px; border: 1px solid #2a3340; border-radius: 8px; background: transparent; color: #aab4c2; font-size: 11px; font-weight: 650; } .pin:hover { color: #f4f7fb; border-color: #52647c; background: #171c25; } .pin[aria-pressed="true"] { color: #dbe5ff; background: #263557; border-color: #6281e8; }
+                button { appearance: none; font: inherit; color: inherit; cursor: pointer; } .icon { width: 30px; height: 30px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #aab4c2; font-size: 22px; line-height: 1; } .icon:hover { background: #171c25; border-color: #2a3340; color: #f4f7fb; } .pin, .stack-toggle { min-width: 55px; height: 30px; margin-right: 4px; padding: 0 7px; border: 1px solid #2a3340; border-radius: 8px; background: transparent; color: #aab4c2; font-size: 11px; font-weight: 650; } .pin:hover, .stack-toggle:hover { color: #f4f7fb; border-color: #52647c; background: #171c25; } .pin[aria-pressed="true"], .stack-toggle[aria-pressed="true"] { color: #dbe5ff; background: #263557; border-color: #6281e8; } .stack-clear { width: 24px; height: 30px; margin: 0 2px 0 -4px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: #ff9daa; font-size: 18px; line-height: 1; } .stack-clear:hover { background: rgba(255,113,133,.12); color: #ffd5dc; }
                 .card { padding: 14px; border-bottom: 1px solid #252e3a; } h2 { margin: 0; font-size: 12px; letter-spacing: .01em; } p { margin: 3px 0 10px; color: #aab4c2; font-size: 11px; }
                 .segmented { display: grid; gap: 5px; padding: 4px; border-radius: 10px; background: #0e1218; border: 1px solid #2a3340; } .segmented.four { grid-template-columns: repeat(4, 1fr); } .segmented.sizes { grid-template-columns: 1.35fr 1fr 1fr; }
                 .segmented button { min-height: 34px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: #aab4c2; } .segmented button:hover { color: #f4f7fb; background: #171c25; } .segmented button[aria-pressed="true"] { color: #fff; background: #263557; border-color: #6281e8; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }

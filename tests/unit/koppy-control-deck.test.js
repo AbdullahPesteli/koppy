@@ -71,6 +71,50 @@ test("live control deck keeps a single modifier and persists choices immediately
     assert.equal(config.saves, 3);
 });
 
+test("live control deck toggles and clears the opt-in Stack without using preferences", () => {
+    const dom = new JSDOM("<!doctype html><html><body></body></html>");
+    const prefs = { floatBar: { position: "top right", previewMaxSizeW: 0, previewMaxSizeH: 0, globalkeys: { ctrl: false, alt: false, shift: false, command: true } } };
+    const config = makeConfig(prefs);
+    let stack = { enabled: false, count: 0, bytes: 0, maxItems: 10, maxBytes: 150 * 1024 * 1024 };
+    let listener;
+    const deck = Deck.install({
+        document: dom.window.document,
+        window: dom.window,
+        config,
+        prefs,
+        requireTrusted: false,
+        getStackState: () => stack,
+        setStackEnabled(enabled) {
+            stack = Object.assign({}, stack, { enabled });
+            listener(stack);
+            return stack;
+        },
+        clearStack() {
+            stack = Object.assign({}, stack, { count: 0, bytes: 0 });
+            listener(stack);
+            return stack;
+        },
+        onStackChange(next) { listener = next; },
+    });
+
+    deck.show();
+    const root = dom.window.document.querySelector("koppy-control-deck").shadowRoot;
+    const toggle = root.querySelector(".stack-toggle");
+    assert.equal(toggle.textContent, "Stack");
+    toggle.click();
+    assert.equal(stack.enabled, true);
+    assert.equal(root.querySelector(".stack-toggle").textContent, "Stack 0");
+    assert.equal(config.saves, 0);
+
+    stack = Object.assign({}, stack, { count: 2, bytes: 5 * 1024 * 1024 });
+    listener(stack);
+    assert.equal(root.querySelector(".stack-toggle").textContent, "Stack 2");
+    root.querySelector(".stack-clear").click();
+    assert.equal(stack.count, 0);
+    assert.equal(stack.bytes, 0);
+    assert.equal(root.querySelector(".stack-clear"), null);
+});
+
 test("live control deck defers to the secure full settings dialog when it is already open", () => {
     const dom = new JSDOM("<!doctype html><html><body></body></html>");
     const prefs = { floatBar: { position: "top right", previewMaxSizeW: 0, previewMaxSizeH: 0, globalkeys: { ctrl: false, alt: false, shift: false, command: true } } };

@@ -242,6 +242,51 @@ test("Cmd+C copies a QuickHover image on a non-Google site and reports on-image 
     assert.deepEqual(feedback.at(-1), ["complete", 2048, 1365]);
 });
 
+test("opt-in Stack retains copied PNGs without changing the single-image system clipboard", async () => {
+    const dom = new JSDOM(`<!doctype html><img id="image" width="320" height="200" src="https://images.example.test/source.jpg">`, {
+        url: "https://en.wikipedia.org/wiki/Example",
+    });
+    const image = makeVisible(dom.window.document.getElementById("image"), 320, 200);
+    const clipboardWrites = [];
+    class ClipboardItemMock { constructor(data) { this.data = data; } }
+    const controller = Koppy.createController({
+        document: dom.window.document,
+        window: dom.window,
+        location: dom.window.location,
+        navigator: {
+            clipboard: {
+                async write(items) {
+                    clipboardWrites.push(await items[0].data["image/png"]);
+                },
+            },
+        },
+        ClipboardItem: ClipboardItemMock,
+        notify() {},
+        resolvePic: () => ({ src: "https://images.example.test/original.png", type: "rule" }),
+        requestImage: () => ({ promise: Promise.resolve({ blob: new Blob(["input"], { type: "image/jpeg" }) }), abort() {} }),
+        normalizeImage: async () => ({ blob: new Blob(["stack-png"], { type: "image/png" }), width: 2048, height: 1365 }),
+    });
+    const stackEvents = [];
+    controller.onStackChange(state => stackEvents.push(state));
+    assert.deepEqual(controller.getStackState(), { enabled: false, count: 0, bytes: 0, maxItems: 10, maxBytes: 150 * 1024 * 1024 });
+    controller.setStackEnabled(true);
+    controller.setHoveredImage(image);
+    const copy = await controller.copyHoveredImage({ key: "c", metaKey: true, target: dom.window.document.body, preventDefault() {}, stopImmediatePropagation() {} });
+
+    assert.equal(copy.status, "copied");
+    assert.equal(copy.stacked, true);
+    assert.equal(copy.stack.count, 1);
+    assert.equal(clipboardWrites.length, 1);
+    assert.equal(clipboardWrites[0].type, "image/png");
+    assert.equal(clipboardWrites[0].size, 9);
+
+    const cleared = controller.clearStack();
+    assert.equal(cleared.count, 0);
+    assert.equal(cleared.enabled, true);
+    assert.equal(clipboardWrites.length, 1, "clearing Koppy Stack must not write or clear the system clipboard");
+    assert.equal(stackEvents.at(-1).count, 0);
+});
+
 test("current udm=2 docid metadata resolves original URL, then labels thumbnail fallback if metadata disappears", () => {
     const dom = domFrom("google-udm2-current.html", "https://www.google.com/search?q=vmaf&udm=2");
     const image = makeVisible(dom.window.document.getElementById("current-udm2-image"));

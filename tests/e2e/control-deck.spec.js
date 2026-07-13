@@ -29,10 +29,24 @@ test("live control deck applies a single modifier, repositions an active bar and
             save() { Object.entries(fields).forEach(([name, field]) => { if (field.value !== null) setPath(prefs, name, field.value); }); return true; },
         };
         window.__repositions = 0;
+        window.__stack = { enabled: false, count: 0, bytes: 0, maxItems: 10, maxBytes: 150 * 1024 * 1024 };
+        let stackListener;
         window.__deck = window.KoppyControlDeck.install({
             document, window, config, prefs,
             getFloatBar: () => ({ shown: true, data: {}, setPosition() { window.__repositions += 1; } }),
             openUpdate: () => { window.__updates = (window.__updates || 0) + 1; return true; },
+            getStackState: () => window.__stack,
+            setStackEnabled(enabled) {
+                window.__stack = Object.assign({}, window.__stack, { enabled });
+                stackListener(window.__stack);
+                return window.__stack;
+            },
+            clearStack() {
+                window.__stack = Object.assign({}, window.__stack, { count: 0, bytes: 0 });
+                stackListener(window.__stack);
+                return window.__stack;
+            },
+            onStackChange(listener) { stackListener = listener; },
         });
         window.__deck.show();
     });
@@ -41,6 +55,7 @@ test("live control deck applies a single modifier, repositions an active bar and
     const panel = host.locator(".panel");
     await expect(panel).toBeVisible();
     await expect(panel).toContainText("Canlı Kontrol");
+    await expect(host.locator(".stack-toggle")).toHaveText("Stack");
     await expect(panel).toContainText("Koppy’yi güncelle");
     await expect(panel).toContainText("Tüm ayarları aç");
     await host.locator('button[aria-label="Command ile önizleme"]').click();
@@ -50,6 +65,8 @@ test("live control deck applies a single modifier, repositions an active bar and
     await expect.poll(() => page.evaluate(() => window.__repositions)).toBe(1);
     await host.locator(".update").click();
     await expect.poll(() => page.evaluate(() => window.__updates)).toBe(1);
+    await host.locator(".stack-toggle").click();
+    await expect.poll(() => page.evaluate(() => window.__stack.enabled)).toBe(true);
 
     await host.locator(".pin").click();
     await page.mouse.click(120, 120);

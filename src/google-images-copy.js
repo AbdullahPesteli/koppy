@@ -11,6 +11,12 @@
     const MAX_IMAGE_BYTES = 80 * 1024 * 1024;
     const MAX_IMAGE_PIXELS = 40 * 1024 * 1024;
     const MAX_IMAGE_DIMENSION = 16384;
+    // Stack is intentionally an in-page, opt-in staging area. It never changes
+    // the system clipboard contract: every Cmd+C still writes just the latest
+    // portable PNG. These limits keep a long picking session from holding an
+    // unbounded amount of decoded image data in the tab.
+    const MAX_STACK_ITEMS = 10;
+    const MAX_STACK_BYTES = 150 * 1024 * 1024;
     const REQUEST_TIMEOUT_MS = 20000;
     const GOOGLE_HOSTNAMES = new Set(["google.com", "google.com.tr"]);
     const GOOGLE_METADATA_CACHE = new WeakMap();
@@ -1072,6 +1078,66 @@
         let documentPreview = null;
         let lastPointer = null;
         let started = false;
+        const stack = {
+            enabled: Boolean(deps.stackEnabled),
+            items: [],
+            bytes: 0,
+            listeners: new Set(),
+        };
+
+        function stackState() {
+            return {
+                enabled: stack.enabled,
+                count: stack.items.length,
+                bytes: stack.bytes,
+                maxItems: MAX_STACK_ITEMS,
+                maxBytes: MAX_STACK_BYTES,
+            };
+        }
+
+        function emitStackChange() {
+            const state = stackState();
+            stack.listeners.forEach(listener => {
+                try { listener(state); } catch (_) {}
+            });
+            return state;
+        }
+
+        function setStackEnabled(enabled) {
+            stack.enabled = Boolean(enabled);
+            return emitStackChange();
+        }
+
+        function clearStack() {
+            // Blob references are the only retained resources. Dropping the array
+            // releases them for garbage collection and deliberately leaves macOS'
+            // existing clipboard untouched.
+            stack.items = [];
+            stack.bytes = 0;
+            return emitStackChange();
+        }
+
+        function addToStack(prepared) {
+            if (!stack.enabled) return { added: false, state: stackState() };
+            const blob = prepared && prepared.blob;
+            const bytes = Math.max(0, Number(blob && blob.size) || 0);
+            if (stack.items.length >= MAX_STACK_ITEMS) {
+                return { added: false, reason: "item-limit", state: stackState() };
+            }
+            if (bytes > MAX_STACK_BYTES || stack.bytes + bytes > MAX_STACK_BYTES) {
+                return { added: false, reason: "byte-limit", state: stackState() };
+            }
+            stack.items.push({
+                blob,
+                bytes,
+                width: prepared.width,
+                height: prepared.height,
+                source: prepared.source,
+                isThumbnailFallback: Boolean(prepared.isThumbnailFallback),
+            });
+            stack.bytes += bytes;
+            return { added: true, state: emitStackChange() };
+        }
 
         function cancelState(state) {
             if (!state) return;
@@ -1411,8 +1477,21 @@
                 ]));
                 const [prepared] = await Promise.all([preparedPromise, writePromise]);
                 feedback.complete(copyState.element, prepared.width, prepared.height, prepared.isThumbnailFallback);
-                notify((prepared.isThumbnailFallback ? "Önizleme kopyalandı: " : "Kopyalandı: ") + prepared.width + "×" + prepared.height, "success");
-                return { status: "copied", width: prepared.width, height: prepared.height, source: prepared.source, isThumbnailFallback: prepared.isThumbnailFallback };
+                const stacked = addToStack(prepared);
+                let message = (prepared.isThumbnailFallback ? "Önizleme kopyalandı: " : "Kopyalandı: ") + prepared.width + "×" + prepared.height;
+                if (stacked.added) message += " · Stack " + stacked.state.count;
+                else if (stack.enabled && stacked.reason === "item-limit") message += " · Stack dolu (" + MAX_STACK_ITEMS + ")";
+                else if (stack.enabled && stacked.reason === "byte-limit") message += " · Stack bellek sınırında";
+                notify(message, stacked.reason ? "progress" : "success");
+                return {
+                    status: "copied",
+                    width: prepared.width,
+                    height: prepared.height,
+                    source: prepared.source,
+                    isThumbnailFallback: prepared.isThumbnailFallback,
+                    stacked: stacked.added,
+                    stack: stacked.state,
+                };
             } catch (error) {
                 cancelState(copyState);
                 const message = error && error.message ? error.message : "Bilinmeyen hata";
@@ -1434,7 +1513,7 @@
             if (isModifierRelease(event)) closeDocumentPreview();
         }
 
-        return {
+        const controller = {
             start() {
                 if (started || !documentLike) return false;
                 if (windowLike && windowLike.top && windowLike.self && windowLike.top !== windowLike.self) return false;
@@ -1465,13 +1544,27 @@
                     windowLike.navigation.removeEventListener("currententrychange", refreshRoute);
                 }
                 cancelAll();
+                clearStack();
                 started = false;
             },
             setHoveredImage,
             copyHoveredImage,
             refreshRoute,
             getState() { return current; },
+            getStackState: stackState,
+            setStackEnabled,
+            clearStack,
+            onStackChange(listener) {
+                if (typeof listener !== "function") return () => {};
+                stack.listeners.add(listener);
+                return () => stack.listeners.delete(listener);
+            },
         };
+        // The build integration uses this one controller instance to wire the
+        // compact Control Deck. Keep it read-only by convention: callers get
+        // methods, not the retained Blob array itself.
+        if (typeof globalThis !== "undefined") globalThis.KoppyCopyController = controller;
+        return controller;
     }
 
     return {
@@ -1479,6 +1572,8 @@
         MAX_IMAGE_BYTES,
         MAX_IMAGE_DIMENSION,
         MAX_IMAGE_PIXELS,
+        MAX_STACK_BYTES,
+        MAX_STACK_ITEMS,
         createController,
         createCopyFeedback,
         createToast,

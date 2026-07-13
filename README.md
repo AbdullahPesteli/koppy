@@ -38,6 +38,12 @@ standart `image/png` clipboard biçimine dönüştürür. Kopyalama sırasında 
 bir ilerleme çizgisi, sonunda da çözünürlüklü kısa “Kopyalandı” bilgisi görünür. Metin seçiliyken veya
 input/textarea/contenteditable alanındayken normal kopyalama davranışı korunur.
 
+Birden fazla görseli ayrıca hazırlamak istenirse Canlı Kontrol’deki varsayılan-kapalı **Görsel Stack**
+açılır. Bu mod normal `Cmd+C` davranışını değiştirmez: macOS panosunda her zaman yalnız son PNG bulunur;
+Koppy aynı başarılı PNG’yi geçici Stack’e de ekler. Sayaç en fazla 10 görsel veya 150 MB tutar. `× Temizle`
+yalnız Koppy’nin belleğini serbest bırakır, mevcut sistem clipboard içeriğini silmez. Stack, tarayıcının
+desteklemediği çok-öğeli clipboard yerine ilerideki ayrı-dosya dışa-aktarma akışı için hazırlık alanıdır.
+
 Hover yalnız URL adayını çözer; ağ/decode işlemi `Cmd+C` öncesinde başlamaz. Google'da Koppy, Picviewer'ın
 çözdüğü kaynakla birlikte bağlantı parametreleri, güncel metadata, lazy-load alanları, `picture`/`srcset` ve
 yüklenmiş büyük preview kaynağını dener. Koppy yalnız `https:`

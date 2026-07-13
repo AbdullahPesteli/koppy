@@ -135,6 +135,67 @@ test("hover + Cmd+C writes one 320×180 PNG and preserves input copy", async ({ 
     expect(consoleErrors).toEqual([]);
 });
 
+test("Stack mode keeps the regular clipboard as one current PNG while retaining a separate in-memory list", async ({ page }) => {
+    await page.route("https://stack.example.test/", route => route.fulfill({
+        status: 200,
+        contentType: "text/html",
+        body: `<!doctype html><img id="image" src="https://images.example.test/source.jpg" style="width:320px;height:180px">`,
+    }));
+    await page.goto("https://stack.example.test/");
+    await page.addScriptTag({ path: modulePath });
+    await page.evaluate(async () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = 320;
+        canvas.height = 180;
+        canvas.getContext("2d").fillRect(0, 0, 320, 180);
+        const png = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+        const image = document.getElementById("image");
+        window.__stackController = window.KoppyGoogleCopy.createController({
+            document,
+            window,
+            location,
+            navigator,
+            ClipboardItem,
+            resolvePic: () => ({ src: "https://images.example.test/original.png", type: "rule" }),
+            requestImage: () => ({ promise: Promise.resolve({ blob: png }), abort() {} }),
+            normalizeImage: async blob => ({ blob, width: 320, height: 180 }),
+        });
+        window.__stackController.setStackEnabled(true);
+        window.__stackController.setHoveredImage(image);
+        const event = { key: "c", metaKey: true, target: document.body, preventDefault() {}, stopImmediatePropagation() {} };
+        window.__stackFirst = await window.__stackController.copyHoveredImage(event);
+        window.__stackSecond = await window.__stackController.copyHoveredImage(event);
+    });
+
+    const result = await page.evaluate(async () => {
+        const items = await navigator.clipboard.read();
+        const blob = await items[0].getType("image/png");
+        const bitmap = await createImageBitmap(blob);
+        const value = {
+            copies: [window.__stackFirst, window.__stackSecond].map(item => ({ status: item.status, stacked: item.stacked, count: item.stack.count })),
+            clipboardItemCount: items.length,
+            clipboardTypes: items[0].types,
+            width: bitmap.width,
+            height: bitmap.height,
+            stack: window.__stackController.getStackState(),
+        };
+        bitmap.close();
+        return value;
+    });
+    expect(result.copies).toEqual([
+        { status: "copied", stacked: true, count: 1 },
+        { status: "copied", stacked: true, count: 2 },
+    ]);
+    expect(result.clipboardItemCount).toBe(1);
+    expect(result.clipboardTypes).toEqual(["image/png"]);
+    expect([result.width, result.height]).toEqual([320, 180]);
+    expect(result.stack.count).toBe(2);
+
+    const cleared = await page.evaluate(() => window.__stackController.clearStack());
+    expect(cleared).toMatchObject({ enabled: true, count: 0, bytes: 0 });
+    expect(await page.evaluate(async () => (await navigator.clipboard.read()).length)).toBe(1);
+});
+
 test("built Koppy userscript boots with Tampermonkey-shaped grants and resolves current udm=2 metadata", async ({ page }) => {
     await page.route("https://www.google.com/search?**", route => route.fulfill({
         status: 200,
