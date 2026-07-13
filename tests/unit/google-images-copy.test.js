@@ -106,6 +106,52 @@ test("a direct image document remains a generic binary-copy candidate", () => {
     assert.equal(candidate.source, "src");
 });
 
+test("generic candidates include CSS backgrounds, video posters and SVG image sources", () => {
+    const dom = new JSDOM(`<!doctype html><body>
+        <button id="card" style="width: 320px; height: 200px; background-image: url('https://cdn.example.test/card-original.webp')"></button>
+        <video id="video" width="320" height="180" poster="https://cdn.example.test/poster.jpg"></video>
+        <svg><image id="svg-image" width="320" height="180" href="https://cdn.example.test/vector-preview.png"></image></svg>
+    </body>`, { url: "https://example.test/gallery" });
+    const { document } = dom.window;
+    const card = makeVisible(document.getElementById("card"), 320, 200);
+    const video = makeVisible(document.getElementById("video"), 320, 180);
+    const svgImage = makeVisible(document.getElementById("svg-image"), 320, 180);
+    assert.deepEqual(Koppy.resolveQuickHoverImageCandidates(card, { baseUrl: dom.window.location.href })[0], {
+        url: "https://cdn.example.test/card-original.webp", element: card, source: "background-image",
+    });
+    assert.equal(Koppy.resolveQuickHoverImageCandidates(video, { baseUrl: dom.window.location.href })[0].url, "https://cdn.example.test/poster.jpg");
+    assert.equal(Koppy.resolveQuickHoverImageCandidates(svgImage, { baseUrl: dom.window.location.href })[0].url, "https://cdn.example.test/vector-preview.png");
+});
+
+test("controller copies a visible CSS background surface instead of requiring an img element", async () => {
+    const dom = new JSDOM(`<!doctype html><body><div id="card" style="width: 320px; height: 200px; background-image: url('https://cdn.example.test/card.png')"></div></body>`, {
+        url: "https://example.test/gallery",
+    });
+    const document = dom.window.document;
+    const card = makeVisible(document.getElementById("card"), 320, 200);
+    class ClipboardItemMock { constructor(data) { this.data = data; } }
+    const controller = Koppy.createController({
+        document,
+        window: dom.window,
+        location: dom.window.location,
+        navigator: { clipboard: { async write(items) { await items[0].data["image/png"]; } } },
+        ClipboardItem: ClipboardItemMock,
+        notify() {},
+        feedback: { start() {}, progress() {}, decoding() {}, complete() {}, fail() {} },
+        requestImage: url => ({ promise: Promise.resolve({ blob: new Blob([url], { type: "image/png" }) }), abort() {} }),
+        normalizeImage: async blob => ({ blob, width: 1600, height: 1000 }),
+    });
+    assert.equal(controller.start(), true);
+    const hover = new dom.window.Event("pointermove", { bubbles: true, composed: true });
+    Object.defineProperties(hover, { clientX: { value: 100 }, clientY: { value: 80 } });
+    card.dispatchEvent(hover);
+    const result = await controller.copyHoveredImage({
+        key: "c", metaKey: true, target: document.body, preventDefault() {}, stopImmediatePropagation() {},
+    });
+    assert.equal(result.status, "copied");
+    assert.equal(result.source, "background-image");
+});
+
 test("QuickHover resolves any site's original first and falls back to the visible image", () => {
     const dom = new JSDOM(`<!doctype html><img id="wiki-image" width="320" height="200" src="https://upload.wikimedia.org/thumb.jpg">`, {
         url: "https://en.wikipedia.org/wiki/Example",

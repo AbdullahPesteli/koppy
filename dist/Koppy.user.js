@@ -12,7 +12,7 @@
 // @description:ja       画像を強力に閲覧できるツール。ポップアップ表示、拡大・縮小、回転、一括保存などの機能を自動で実行できます
 // @description:pt-BR    Poderosa ferramenta de visualização de imagens on-line, que pode pop-up/dimensionar/girar/salvar em lote imagens automaticamente
 // @description:ru       Мощный онлайн-инструмент для просмотра изображений, который может автоматически отображать/масштабировать/вращать/пакетно сохранять изображения
-// @version              0.3.0
+// @version              0.3.1
 // @icon                 data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAMAAADXqc3KAAAAV1BMVEUAAAD////29vbKysoqKioiIiKysrKhoaGTk5N9fX3z8/Pv7+/r6+vk5OTb29vOzs6Ojo5UVFQzMzMZGRkREREMDAy4uLisrKylpaV4eHhkZGRPT08/Pz/IfxjQAAAAgklEQVQoz53RRw7DIBBAUb5pxr2m3/+ckfDImwyJlL9DDzQgDIUMRu1vWOxTBdeM+onApENF0qHjpkOk2VTwLVEF40Kbfj1wK8AVu2pQA1aBBYDHJ1wy9Cf4cXD5chzNAvsAnc8TjoLAhIzsBao9w1rlVTIvkOYMd9nm6xPi168t9AYkbANdajpjcwAAAABJRU5ErkJggg==
 // @namespace            https://github.com/AbdullahPesteli/koppy
 // @homepage             https://github.com/AbdullahPesteli/koppy
@@ -36866,6 +36866,54 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
         return sources;
     }
 
+    function imageUrlsFromBackground(element, baseUrl) {
+        if (!element) return [];
+        const windowLike = element.ownerDocument && element.ownerDocument.defaultView;
+        let value = "";
+        try {
+            value = windowLike && typeof windowLike.getComputedStyle === "function"
+                ? windowLike.getComputedStyle(element).backgroundImage
+                : element.style && element.style.backgroundImage;
+        } catch (_) {}
+        if (!value || value === "none") return [];
+        const matches = String(value).matchAll(/url\(\s*(["']?)(.*?)\1\s*\)/gi);
+        const candidates = [];
+        const seen = new Set();
+        for (const match of matches) {
+            const normalized = normalizeCandidateUrl(match[2], baseUrl);
+            if (!normalized || seen.has(normalized)) continue;
+            seen.add(normalized);
+            candidates.push({ url: normalized, source: "background-image" });
+        }
+        return candidates;
+    }
+
+    function imageUrlsFromMediaElement(element, baseUrl) {
+        if (!element || !element.getAttribute) return [];
+        const tagName = String(element.nodeName || "").toUpperCase();
+        const entries = [];
+        const add = (raw, source) => {
+            const url = normalizeCandidateUrl(raw, baseUrl);
+            if (url && !entries.some(candidate => candidate.url === url)) entries.push({ url, source });
+        };
+        if (tagName === "VIDEO") add(element.poster || element.getAttribute("poster"), "poster");
+        if (tagName === "IMAGE") {
+            add(element.href && element.href.baseVal, "svg-href");
+            add(element.getAttribute("href"), "svg-href");
+            add(element.getAttribute("xlink:href"), "svg-xlink-href");
+        }
+        return entries;
+    }
+
+    function isImageSurface(element) {
+        if (!element || element.nodeType !== 1 || element.isConnected === false) return false;
+        const tagName = String(element.nodeName || "").toUpperCase();
+        if (tagName === "IMG") return true;
+        if (tagName === "VIDEO" && (element.poster || (element.getAttribute && element.getAttribute("poster")))) return true;
+        if (tagName === "IMAGE" && element.getAttribute && (element.getAttribute("href") || element.getAttribute("xlink:href"))) return true;
+        return imageUrlsFromBackground(element, element.ownerDocument && element.ownerDocument.baseURI).length > 0;
+    }
+
     function isLikelyLoadedPreview(element) {
         if (!element) return false;
         const rect = typeof element.getBoundingClientRect === "function" ? element.getBoundingClientRect() : null;
@@ -36976,7 +37024,7 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
 
     function resolveQuickHoverImageCandidates(element, options) {
         const settings = options || {};
-        if (!element || String(element.nodeName).toUpperCase() !== "IMG") return [];
+        if (!isImageSurface(element)) return [];
         const baseUrl = settings.baseUrl || (element.ownerDocument && element.ownerDocument.baseURI) || "https://example.invalid/";
         const candidates = [];
         const seen = new Set();
@@ -36989,7 +37037,7 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
 
         // Picviewer already knows how to resolve many site-specific previews. Prefer that
         // answer, but do not require a site rule: the visible image remains a safe fallback.
-        if (typeof settings.resolvePic === "function") {
+        if (String(element.nodeName).toUpperCase() === "IMG" && typeof settings.resolvePic === "function") {
             try {
                 const resolved = settings.resolvePic(element) || {};
                 add(resolved.src, "quickhover:" + (resolved.type || "resolved"));
@@ -36999,7 +37047,9 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
         }
 
         imageUrlsFromAttributes(element, baseUrl).forEach(candidate => add(candidate.url, candidate.source));
-        imageSourceSet(element, baseUrl).forEach(candidate => add(candidate.url, candidate.source));
+        imageUrlsFromMediaElement(element, baseUrl).forEach(candidate => add(candidate.url, candidate.source));
+        imageUrlsFromBackground(element, baseUrl).forEach(candidate => add(candidate.url, candidate.source));
+        if (String(element.nodeName).toUpperCase() === "IMG") imageSourceSet(element, baseUrl).forEach(candidate => add(candidate.url, candidate.source));
         return candidates;
     }
 
@@ -37196,7 +37246,7 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
     }
 
     function isLikelyResultImage(image) {
-        if (!image || String(image.nodeName).toUpperCase() !== "IMG" || image.isConnected === false) return false;
+        if (!isImageSurface(image)) return false;
         const rect = typeof image.getBoundingClientRect === "function" ? image.getBoundingClientRect() : null;
         const width = Number(image.clientWidth || image.width || (rect && rect.width) || 0);
         const height = Number(image.clientHeight || image.height || (rect && rect.height) || 0);
@@ -37490,10 +37540,38 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
             return lastPointer.x >= rect.left && lastPointer.x <= rect.right && lastPointer.y >= rect.top && lastPointer.y <= rect.bottom;
         }
 
+        function surfaceFromNodes(nodes) {
+            for (const node of nodes || []) {
+                if (isImageSurface(node)) return node;
+            }
+            return null;
+        }
+
+        function nearestImageSurface(node) {
+            let current = node;
+            let remaining = 8;
+            while (current && remaining-- > 0) {
+                if (isImageSurface(current)) return current;
+                current = current.parentElement || (current.getRootNode && current.getRootNode().host) || null;
+            }
+            return null;
+        }
+
+        function deepElementFromPoint(rootNode, x, y) {
+            if (!rootNode || typeof rootNode.elementFromPoint !== "function") return null;
+            let target = rootNode.elementFromPoint(x, y);
+            while (target && target.shadowRoot && typeof target.shadowRoot.elementFromPoint === "function") {
+                const nested = target.shadowRoot.elementFromPoint(x, y);
+                if (!nested || nested === target) break;
+                target = nested;
+            }
+            return target;
+        }
+
         function imageAtPointer(event) {
             const path = typeof event.composedPath === "function" ? event.composedPath() : [];
-            let image = path.find(node => node && String(node.nodeName).toUpperCase() === "IMG");
-            if (!image && event.target && String(event.target.nodeName).toUpperCase() === "IMG") image = event.target;
+            let image = surfaceFromNodes(path);
+            if (!image) image = nearestImageSurface(event.target);
             if (!image && event.target && event.target.closest) {
                 const result = event.target.closest("[data-docid], [jscontroller='aw2uhd']");
                 const possible = result && result.querySelector && result.querySelector("img");
@@ -37507,12 +37585,20 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
 
         function imageAtLastPointer() {
             if (!lastPointer || !documentLike || typeof documentLike.elementFromPoint !== "function") return null;
-            const target = documentLike.elementFromPoint(lastPointer.x, lastPointer.y);
+            const target = deepElementFromPoint(documentLike, lastPointer.x, lastPointer.y);
             return imageAtPointer({
                 target,
                 clientX: lastPointer.x,
                 clientY: lastPointer.y,
-                composedPath() { return target ? [target] : []; },
+                composedPath() {
+                    const path = [];
+                    let current = target;
+                    while (current) {
+                        path.push(current);
+                        current = current.parentElement || (current.getRootNode && current.getRootNode().host) || null;
+                    }
+                    return path;
+                },
             });
         }
 

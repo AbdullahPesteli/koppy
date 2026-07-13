@@ -31,8 +31,9 @@ bilerek git'te tutulur: Tampermonkey her sürümde buradan güncelleme alır.
 ## Kullanım
 
 Wikipedia dahil desteklenen herhangi bir sitede görselin üzerinde bekleyip `Cmd+C` yap. Koppy önce
-QuickHover/Picviewer'ın çözdüğü daha iyi URL'yi, yoksa ekranda görünen görselin URL'sini kullanır;
-çıktıyı standart `image/png` clipboard biçimine dönüştürür. Kopyalama sırasında görselin üzerinde ince
+QuickHover/Picviewer'ın çözdüğü daha iyi URL'yi, yoksa ekranda görünen görselin URL'sini kullanır. Normal
+`<img>` yanında CSS `background-image`, video `poster` ve SVG `<image>` yüzeyleri de adaydır; çıktıyı
+standart `image/png` clipboard biçimine dönüştürür. Kopyalama sırasında görselin üzerinde ince
 bir ilerleme çizgisi, sonunda da çözünürlüklü kısa “Kopyalandı” bilgisi görünür. Metin seçiliyken veya
 input/textarea/contenteditable alanındayken normal kopyalama davranışı korunur.
 

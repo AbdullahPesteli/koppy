@@ -1,12 +1,12 @@
 # Koppy — Durum
 
-**Sürüm:** 0.3.0
+**Sürüm:** 0.3.1
 **Lisans:** MIT
 **Dağıtım:** `dist/Koppy.user.js` üzerinden Tampermonkey
 
 ## Şu an
 
-- Google Görseller'de Picviewer sonucu, bağlantı/metaveri/lazy-load alanları, `picture`/`srcset` ve büyük yüklenmiş preview adaylarını sıralayarak; diğer sitelerde QuickHover/görünür görsel fallback'iyle `Cmd+C` sonucu `image/png` olarak panoya yazar.
+- Google Görseller'de Picviewer sonucu, bağlantı/metaveri/lazy-load alanları, `picture`/`srcset` ve büyük yüklenmiş preview adaylarını sıralayarak; diğer sitelerde QuickHover/görünür görsel fallback'iyle `Cmd+C` sonucu `image/png` olarak panoya yazar. Görünür CSS `background-image`, video `poster` ve SVG `<image>` yüzeyleri de adaydır.
 - Kopyalama, mümkünse QuickHover'ın süzülen preview panelinde ince ilerleme çizgisi ve çözünürlüklü başarı bilgisi verir; küçük kaynak görsel yalnız ince hedef çerçevesi taşır. Metin kopyalamayı bozmaz.
 - QuickHover önizlemesi boş boyut ayarında ekranı kaplamak yerine yaklaşık ekranın %72'sine sığar; elle girilen sınır korunur.
 - Tampermonkey menüsündeki **Koppy Canlı Kontrol**, sık kullanılan modifier, FloatBar konumu ve preview boyutunu küçük bir panelden gerçek davranışa anında uygular. Panel üst sağda açılır, başlığından sürüklenebilir; **sabitle** açıkken sayfada deneme yaparken kapanmaz. Aynı paneldeki **Koppy’yi güncelle** eylemi Tampermonkey güncelleme sayfasını doğrudan açar.
@@ -15,15 +15,15 @@
 
 ## Doğrulama
 
-- Unit/DOM: 33 test
+- Unit/DOM: 39 test
 - Browser E2E: 8 test
 - Bağımlılık denetimi: `npm audit --audit-level=high`
 
 ## Sıradaki
 
-1. Zen + Tampermonkey'de üç gerçek Google Görseliyle canlı clipboard kabulünü tamamlamak.
-2. FloatBar ve preview akışını yenilemek.
-3. Galeri deneyimini modernize etmek.
+1. MaxURL'ın Apache-2.0 URL dönüşüm motorundan küçük, fixture'lı ve güvenli bir resolver adaptörü çıkarmak.
+2. Koppy Bridge için opt-in Firefox/Zen companion extension izni ve mimarisini karara bağlamak; cookie/ağ gözlemi yalnız bu katmanda kalacak.
+3. Zen + Tampermonkey'de üç gerçek Google Görseliyle canlı clipboard kabulünü tamamlamak.
 
 ## Proje yapısı
 
@@ -45,4 +45,5 @@
 - 0.2.8: Tampermonkey açılır menüsüne ve Canlı Kontrol paneline tek tıklamalı **Koppy’yi güncelle** eylemi eklendi. Eylem yalnız Koppy'nin sabit GitHub yayın URL'sini açar; uzaktan kod çalıştırmaz.
 - 0.2.9: Canlı Kontrol üst sağda açılacak şekilde düzenlendi; panel sürüklenebilir ve sabitlenebilir oldu. Sabit değilken sayfaya tıklama paneli kapatır, sabitken hover/deneme sırasında açık kalır.
 - 0.3.0: Google aday çözümleme, Picviewer'ın eşit `src/imgSrc` sonuçlarını, lazy-load alanlarını, `picture`/`srcset` kaynaklarını ve yüklenmiş büyük preview'i kapsayacak şekilde genişletildi. Küçük Google thumbnail'ı fallback olarak hâlâ engellidir.
+- 0.3.1: Açık kaynak taramasıyla MaxURL (Apache-2.0), Image Downloader (lisans yok), KellyC (GPL-3.0) ve Imagus Reborn (lisans yok) değerlendirildi. Koppy'ye bağımsız CSS `background-image`, video `poster` ve SVG `<image>` adayları eklendi; 39 unit + 8 browser E2E test geçti. Ayrıntılı araştırma notu yerel `docs/private/` altında tutulur.
 - Tampermonkey kurulum sayfası Zen'de arka planda açıldı. İlk kurulumdan sonra **Automatic installation** açık olmalıdır.
