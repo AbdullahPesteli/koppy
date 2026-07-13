@@ -281,7 +281,25 @@ test("GM request validates status, MIME, size and redirect target", async () => 
         return { abort() {} };
     });
     assert.equal((await success.promise).blob, png);
-    assert.equal(successOptions.redirect, "error");
+    assert.equal(successOptions.redirect, "manual");
+
+    const redirectedUrls = [];
+    const redirected = Koppy.requestImageWithGM("https://graphics.pixar.com/usd/images/USDPipeline2016_video.png", options => {
+        redirectedUrls.push(options.url);
+        queueMicrotask(() => {
+            if (redirectedUrls.length === 1) {
+                options.onload({ status: 301, responseHeaders: "Location: https://www.openusd.org/images/USDPipeline2016_video.png" });
+            } else {
+                options.onload({ status: 200, response: png, finalUrl: options.url, responseHeaders: "Content-Type: image/png" });
+            }
+        });
+        return { abort() {} };
+    });
+    assert.equal((await redirected.promise).blob, png);
+    assert.deepEqual(redirectedUrls, [
+        "https://graphics.pixar.com/usd/images/USDPipeline2016_video.png",
+        "https://www.openusd.org/images/USDPipeline2016_video.png",
+    ]);
 
     let called = false;
     const unsafe = Koppy.requestImageWithGM("https://127.0.0.1/a.png", () => { called = true; });
@@ -316,6 +334,12 @@ test("GM request validates status, MIME, size and redirect target", async () => 
         return { abort() {} };
     });
     await assert.rejects(privateRedirect.promise, /güvenli olmayan bir adrese/);
+
+    const blockedLocation = Koppy.requestImageWithGM("https://images.example.test/redirect-location.png", options => {
+        queueMicrotask(() => options.onload({ status: 302, responseHeaders: "Location: https://127.0.0.1/secret" }));
+        return { abort() {} };
+    });
+    await assert.rejects(blockedLocation.promise, /güvenli olmayan bir adrese/);
 
     let progressAborted = false;
     const progressLimited = Koppy.requestImageWithGM("https://images.example.test/stream.png", options => {

@@ -454,6 +454,7 @@
         const settings = options || {};
         const maxBytes = settings.maxBytes || MAX_IMAGE_BYTES;
         const timeout = settings.timeout || REQUEST_TIMEOUT_MS;
+        const maxRedirects = Number.isInteger(settings.maxRedirects) ? settings.maxRedirects : 5;
         const onProgress = typeof settings.onProgress === "function" ? settings.onProgress : null;
         const safeUrl = normalizeCandidateUrl(url, "https://www.google.com/");
         if (!safeUrl) {
@@ -471,46 +472,59 @@
                 settled = true;
                 reject(error);
             };
-            requestHandle = gmRequest({
-                method: "GET",
-                url: safeUrl,
-                responseType: "blob",
-                anonymous: true,
-                redirect: "error",
-                timeout,
-                onprogress(progress) {
-                    if (onProgress) onProgress(progress);
-                    if (Number(progress.loaded || 0) <= maxBytes && (!progress.lengthComputable || Number(progress.total || 0) <= maxBytes)) return;
-                    fail(new Error("Görsel " + Math.round(maxBytes / 1024 / 1024) + " MB güvenlik sınırını aşıyor"));
-                    if (requestHandle && typeof requestHandle.abort === "function") requestHandle.abort();
-                },
-                onload(response) {
-                    if (settled) return;
-                    try {
-                        if (response.status < 200 || response.status >= 300) throw new Error("Görsel isteği HTTP " + response.status + " döndürdü");
-                        const finalUrl = normalizeCandidateUrl(response.finalUrl || safeUrl, safeUrl);
-                        if (!finalUrl) throw new Error("Görsel güvenli olmayan bir adrese yönlendirildi");
-                        const headers = parseResponseHeaders(response.responseHeaders);
-                        const declaredLength = Number(headers["content-length"] || 0);
-                        if (declaredLength > maxBytes) throw new Error("Görsel " + Math.round(maxBytes / 1024 / 1024) + " MB güvenlik sınırını aşıyor");
-                        const blob = response.response;
-                        if (!blob || typeof blob.size !== "number" || blob.size === 0) throw new Error("Görsel yanıtı boş");
-                        if (blob.size > maxBytes) throw new Error("Görsel " + Math.round(maxBytes / 1024 / 1024) + " MB güvenlik sınırını aşıyor");
-                        const mime = String(blob.type || headers["content-type"] || "").split(";", 1)[0].toLowerCase();
-                        // Servers frequently label AI/PDF and newer image formats as
-                        // octet-stream. Accept only potential media here; byte-signature
-                        // validation happens before decoding below.
-                        if (!isCopyableDeclaredType(mime)) throw new Error("Bu yanıt bir görsel veya belge değil: " + (mime || "bilinmiyor"));
-                        settled = true;
-                        resolve({ blob: blob.type === mime ? blob : new Blob([blob], { type: mime }), finalUrl });
-                    } catch (error) {
-                        fail(error);
-                    }
-                },
-                onerror() { fail(new Error("Görsel indirilemedi")); },
-                ontimeout() { fail(new Error("Görsel indirme zaman aşımına uğradı")); },
-                onabort() { fail(new Error("Görsel indirme iptal edildi")); },
-            });
+            const request = (requestUrl, redirectCount) => {
+                requestHandle = gmRequest({
+                    method: "GET",
+                    url: requestUrl,
+                    responseType: "blob",
+                    anonymous: true,
+                    // Do not let the privileged userscript fetch an unchecked redirect.
+                    // Each Location is normalized (HTTPS + no private host) before its
+                    // next request, which permits normal CDN migrations like Pixar → OpenUSD.
+                    redirect: "manual",
+                    timeout,
+                    onprogress(progress) {
+                        if (onProgress) onProgress(progress);
+                        if (Number(progress.loaded || 0) <= maxBytes && (!progress.lengthComputable || Number(progress.total || 0) <= maxBytes)) return;
+                        fail(new Error("Görsel " + Math.round(maxBytes / 1024 / 1024) + " MB güvenlik sınırını aşıyor"));
+                        if (requestHandle && typeof requestHandle.abort === "function") requestHandle.abort();
+                    },
+                    onload(response) {
+                        if (settled) return;
+                        try {
+                            const headers = parseResponseHeaders(response.responseHeaders);
+                            if (response.status >= 300 && response.status < 400) {
+                                if (redirectCount >= maxRedirects) throw new Error("Görsel çok fazla yönlendirme yaptı");
+                                const nextUrl = normalizeCandidateUrl(headers.location, requestUrl);
+                                if (!nextUrl) throw new Error("Görsel güvenli olmayan bir adrese yönlendirildi");
+                                request(nextUrl, redirectCount + 1);
+                                return;
+                            }
+                            if (response.status < 200 || response.status >= 300) throw new Error("Görsel isteği HTTP " + response.status + " döndürdü");
+                            const finalUrl = normalizeCandidateUrl(response.finalUrl || requestUrl, requestUrl);
+                            if (!finalUrl) throw new Error("Görsel güvenli olmayan bir adrese yönlendirildi");
+                            const declaredLength = Number(headers["content-length"] || 0);
+                            if (declaredLength > maxBytes) throw new Error("Görsel " + Math.round(maxBytes / 1024 / 1024) + " MB güvenlik sınırını aşıyor");
+                            const blob = response.response;
+                            if (!blob || typeof blob.size !== "number" || blob.size === 0) throw new Error("Görsel yanıtı boş");
+                            if (blob.size > maxBytes) throw new Error("Görsel " + Math.round(maxBytes / 1024 / 1024) + " MB güvenlik sınırını aşıyor");
+                            const mime = String(blob.type || headers["content-type"] || "").split(";", 1)[0].toLowerCase();
+                            // Servers frequently label AI/PDF and newer image formats as
+                            // octet-stream. Accept only potential media here; byte-signature
+                            // validation happens before decoding below.
+                            if (!isCopyableDeclaredType(mime)) throw new Error("Bu yanıt bir görsel veya belge değil: " + (mime || "bilinmiyor"));
+                            settled = true;
+                            resolve({ blob: blob.type === mime ? blob : new Blob([blob], { type: mime }), finalUrl });
+                        } catch (error) {
+                            fail(error);
+                        }
+                    },
+                    onerror() { fail(new Error("Görsel indirilemedi")); },
+                    ontimeout() { fail(new Error("Görsel indirme zaman aşımına uğradı")); },
+                    onabort() { fail(new Error("Görsel indirme iptal edildi")); },
+                });
+            };
+            request(safeUrl, 0);
         });
         return {
             promise,

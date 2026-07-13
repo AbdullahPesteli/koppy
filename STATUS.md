@@ -1,6 +1,6 @@
 # Koppy — Durum
 
-**Sürüm:** 0.4.3
+**Sürüm:** 0.4.4
 **Lisans:** MIT
 **Dağıtım:** `dist/Koppy.user.js` üzerinden Tampermonkey
 
@@ -16,7 +16,7 @@
 
 ## Doğrulama
 
-- Unit/DOM: 43 test
+- Unit/DOM: 44 test
 - Browser E2E: 12 test (gerçek PDF.js render, Turkcell-tipi küçük bağlantı ve yerel Picviewer belge önizlemesi dahil)
 - Bağımlılık denetimi: `npm audit --audit-level=high`
 
@@ -53,4 +53,5 @@
 - 0.4.1: PDF/AI indirme seçeneklerinin sadece kısa metin linki olduğu kartlar artık aday boyut filtresine takılmaz. Turkcell logo sayfasındaki gerçek adres ve MIME'lar doğrulandı: PDF `application/pdf`, AI dosyası PDF-uyumlu `%PDF-` başlığı taşıyor. 44 unit ve 10 browser E2E testi geçti; E2E kısa PDF/AI linkinde gerçek hover + `Cmd+C` akışını doğrular.
 - 0.4.2: Picviewer'ın yalnız `<img>` için sunduğu Cmd-basılı QuickHover davranışı, PDF ve PDF-uyumlu AI indirme linklerine de eklendi. Koppy ilk sayfayı küçük "Belge önizlemesi" panelinde gösterir; Cmd bırakılınca panel kapanır ve `Cmd+C` aynı PNG dönüşümünü kullanır.
 - 0.4.3: Ayrı Koppy belge paneli kaldırıldı. PDF/AI-PDF önizlemesi artık mevcut Picviewer QuickHover penceresinin aynı sınıflarını, konumlandırmasını ve boyut kurallarını kullanır; böylece JPEG/PNG ile aynı deneyimdedir.
+- 0.4.4: Güvenli HTTPS yönlendirmeleri artık tek tek doğrulanarak takip edilir. OpenUSD/Pixar görseli gibi CDN taşınmaları kopyalanır; HTTP, özel ağ/localhost hedefi, eksik `Location` ve beşten fazla yönlendirme yine reddedilir.
 - Tampermonkey kurulum sayfası Zen'de arka planda açıldı. İlk kurulumdan sonra **Automatic installation** açık olmalıdır.
