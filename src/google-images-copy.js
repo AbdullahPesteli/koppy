@@ -138,16 +138,66 @@
         return nodes;
     }
 
-    function imageUrlFromAttributes(element, baseUrl) {
-        const preferred = ["data-ou", "data-iurl", "data-original", "data-original-src", "data-full", "data-full-src"];
+    function imageUrlsFromAttributes(element, baseUrl) {
+        // Google, galleries and lazy loaders do not agree on a single original-image
+        // attribute. Keep every safe candidate so a stale/broken first URL can fall
+        // through to the next one during the actual Cmd+C request.
+        const preferred = [
+            "data-ou", "data-iurl", "data-original", "data-original-src", "data-original-url",
+            "data-full", "data-full-src", "data-full-url", "data-image-url", "data-zoom-image",
+            "data-src", "data-lazy-src", "data-lzy-src", "data-url",
+        ];
+        const results = [];
+        const seen = new Set();
         for (const node of elementAndAncestors(element, 6)) {
             for (const name of preferred) {
                 const value = node.getAttribute && node.getAttribute(name);
                 const normalized = normalizeCandidateUrl(value, baseUrl);
-                if (normalized && !isKnownGoogleThumbnail(normalized)) return { url: normalized, source: name };
+                if (normalized && !isKnownGoogleThumbnail(normalized) && !seen.has(normalized)) {
+                    seen.add(normalized);
+                    results.push({ url: normalized, source: name });
+                }
             }
         }
-        return null;
+        return results;
+    }
+
+    function imageUrlFromAttributes(element, baseUrl) {
+        return imageUrlsFromAttributes(element, baseUrl)[0] || null;
+    }
+
+    function imageSourceSet(element, baseUrl, includeDirectSource) {
+        const sources = [];
+        const seen = new Set();
+        const add = (raw, source) => {
+            const normalized = normalizeCandidateUrl(raw, baseUrl);
+            if (!normalized || isKnownGoogleThumbnail(normalized) || seen.has(normalized)) return;
+            seen.add(normalized);
+            sources.push({ url: normalized, source });
+        };
+        parseSrcset(element && element.getAttribute && element.getAttribute("srcset"), baseUrl)
+            .forEach(candidate => add(candidate.url, "srcset"));
+        const picture = element && element.closest && element.closest("picture");
+        if (picture && picture.querySelectorAll) {
+            picture.querySelectorAll("source[srcset]").forEach(node => {
+                parseSrcset(node.getAttribute("srcset"), baseUrl).forEach(candidate => add(candidate.url, "picture-srcset"));
+            });
+        }
+        if (includeDirectSource !== false) {
+            add(element && element.currentSrc, "currentSrc");
+            add(element && (element.src || (element.getAttribute && element.getAttribute("src"))), "src");
+        }
+        return sources;
+    }
+
+    function isLikelyLoadedPreview(element) {
+        if (!element) return false;
+        const rect = typeof element.getBoundingClientRect === "function" ? element.getBoundingClientRect() : null;
+        const width = Number(element.clientWidth || element.width || (rect && rect.width) || 0);
+        const height = Number(element.clientHeight || element.height || (rect && rect.height) || 0);
+        // Google thumbnails are commonly external CDN URLs too. Only its visibly
+        // expanded preview can safely act as a direct-source fallback.
+        return width >= 320 || height >= 240;
     }
 
     function decodeGoogleJsonString(value) {
@@ -218,12 +268,13 @@
         };
         if (typeof settings.resolvePic === "function") {
             try {
-                const resolved = settings.resolvePic(element);
-                const current = normalizeCandidateUrl(resolved && resolved.imgSrc, baseUrl);
-                const actual = normalizeCandidateUrl(resolved && resolved.src, baseUrl);
-                if (actual && actual !== current && !isKnownGoogleThumbnail(actual)) {
-                    add(actual, "picviewer:" + (resolved.type || "unknown"));
-                }
+                const resolved = settings.resolvePic(element) || {};
+                const source = "picviewer:" + (resolved.type || "unknown");
+                // Some Picviewer rules intentionally set src and imgSrc to the same
+                // original URL. The old equality guard discarded that valid answer.
+                add(resolved.src, source);
+                if (Array.isArray(resolved.srcs)) resolved.srcs.forEach(url => add(url, source + "-srcs"));
+                add(resolved.imgSrc, "picviewer-visible");
             } catch (_) {}
         }
 
@@ -234,11 +285,12 @@
         const fromMetadata = imageUrlFromGoogleMetadata(element, settings.document || element.ownerDocument, baseUrl);
         if (fromMetadata) add(fromMetadata.url, fromMetadata.source, { width: fromMetadata.width, height: fromMetadata.height });
 
-        const fromAttributes = imageUrlFromAttributes(element, baseUrl);
-        if (fromAttributes) add(fromAttributes.url, fromAttributes.source);
+        imageUrlsFromAttributes(element, baseUrl).forEach(candidate => add(candidate.url, candidate.source));
 
-        const srcset = parseSrcset(element.getAttribute && element.getAttribute("srcset"), baseUrl);
-        if (srcset.length) add(srcset[0].url, "srcset");
+        // A Google result can turn into a loaded, non-gstatic preview while its
+        // metadata is still late. That visible source is safe to try; known Google
+        // thumbnails remain explicitly excluded in imageSourceSet/add above.
+        imageSourceSet(element, baseUrl, isLikelyLoadedPreview(element)).forEach(candidate => add(candidate.url, candidate.source));
         return candidates;
     }
 
@@ -270,11 +322,8 @@
             } catch (_) {}
         }
 
-        const fromAttributes = imageUrlFromAttributes(element, baseUrl);
-        if (fromAttributes) add(fromAttributes.url, fromAttributes.source);
-        parseSrcset(element.getAttribute && element.getAttribute("srcset"), baseUrl).forEach(candidate => add(candidate.url, "srcset"));
-        add(element.currentSrc, "currentSrc");
-        add(element.src || (element.getAttribute && element.getAttribute("src")), "src");
+        imageUrlsFromAttributes(element, baseUrl).forEach(candidate => add(candidate.url, candidate.source));
+        imageSourceSet(element, baseUrl).forEach(candidate => add(candidate.url, candidate.source));
         return candidates;
     }
 

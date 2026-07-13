@@ -72,6 +72,40 @@ test("Picviewer result wins, then udm=2 data and highest srcset are used", () =>
     assert.equal(viaSrcset.source, "srcset");
 });
 
+test("Google keeps Picviewer originals even when src and imgSrc are equal, and accepts a loaded non-thumbnail preview", () => {
+    const dom = new JSDOM(`<!doctype html><body>
+        <img id="thumb" width="120" height="80" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:only-thumb">
+        <img id="preview" width="640" height="400" src="https://cdn.example.test/loaded-preview.webp">
+        <picture><source srcset="https://cdn.example.test/preview-2x.webp 2x"><img id="picture" width="640" height="400" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:picture"></picture>
+    </body>`, { url: "https://www.google.com/search?q=preview&udm=2" });
+    const thumb = makeVisible(dom.window.document.getElementById("thumb"));
+    const viaEqualPicviewer = Koppy.resolveGoogleImage(thumb, {
+        baseUrl: dom.window.location.href,
+        resolvePic: () => ({ src: "https://images.example.test/picviewer-original.png", imgSrc: "https://images.example.test/picviewer-original.png", type: "preview" }),
+    });
+    assert.equal(viaEqualPicviewer.url, "https://images.example.test/picviewer-original.png");
+    assert.equal(viaEqualPicviewer.source, "picviewer:preview");
+
+    const preview = makeVisible(dom.window.document.getElementById("preview"), 640, 400);
+    assert.deepEqual(Koppy.resolveGoogleImage(preview, { baseUrl: dom.window.location.href }), {
+        url: "https://cdn.example.test/loaded-preview.webp",
+        element: preview,
+        source: "src",
+    });
+
+    const picture = makeVisible(dom.window.document.getElementById("picture"), 640, 400);
+    assert.equal(Koppy.resolveGoogleImage(picture, { baseUrl: dom.window.location.href }).url, "https://cdn.example.test/preview-2x.webp");
+});
+
+test("a direct image document remains a generic binary-copy candidate", () => {
+    const url = "https://www.solveigmm.com/content/files/00/04/dd/oK3Do7ONI7w0.png";
+    const dom = new JSDOM(`<!doctype html><img id="direct" width="402" height="316" src="${url}">`, { url });
+    const image = makeVisible(dom.window.document.getElementById("direct"), 402, 316);
+    const candidate = Koppy.resolveQuickHoverImageCandidates(image, { baseUrl: dom.window.location.href })[0];
+    assert.equal(candidate.url, url);
+    assert.equal(candidate.source, "src");
+});
+
 test("QuickHover resolves any site's original first and falls back to the visible image", () => {
     const dom = new JSDOM(`<!doctype html><img id="wiki-image" width="320" height="200" src="https://upload.wikimedia.org/thumb.jpg">`, {
         url: "https://en.wikipedia.org/wiki/Example",

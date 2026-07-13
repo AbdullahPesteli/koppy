@@ -1,12 +1,12 @@
 # Koppy — Durum
 
-**Sürüm:** 0.2.9
+**Sürüm:** 0.3.0
 **Lisans:** MIT
 **Dağıtım:** `dist/Koppy.user.js` üzerinden Tampermonkey
 
 ## Şu an
 
-- Google Görseller'de gerçek adayla, diğer sitelerde QuickHover/görünür görsel fallback'iyle `Cmd+C` sonucu `image/png` olarak panoya yazar.
+- Google Görseller'de Picviewer sonucu, bağlantı/metaveri/lazy-load alanları, `picture`/`srcset` ve büyük yüklenmiş preview adaylarını sıralayarak; diğer sitelerde QuickHover/görünür görsel fallback'iyle `Cmd+C` sonucu `image/png` olarak panoya yazar.
 - Kopyalama, mümkünse QuickHover'ın süzülen preview panelinde ince ilerleme çizgisi ve çözünürlüklü başarı bilgisi verir; küçük kaynak görsel yalnız ince hedef çerçevesi taşır. Metin kopyalamayı bozmaz.
 - QuickHover önizlemesi boş boyut ayarında ekranı kaplamak yerine yaklaşık ekranın %72'sine sığar; elle girilen sınır korunur.
 - Tampermonkey menüsündeki **Koppy Canlı Kontrol**, sık kullanılan modifier, FloatBar konumu ve preview boyutunu küçük bir panelden gerçek davranışa anında uygular. Panel üst sağda açılır, başlığından sürüklenebilir; **sabitle** açıkken sayfada deneme yaparken kapanmaz. Aynı paneldeki **Koppy’yi güncelle** eylemi Tampermonkey güncelleme sayfasını doğrudan açar.
@@ -44,4 +44,5 @@
 - 0.2.7: Tampermonkey menüsünden açılan, gerçek FloatBar/preview'e canlı bağlı kompakt kontrol paneli eklendi. Programatik sayfa tıklamaları ayar değiştiremez.
 - 0.2.8: Tampermonkey açılır menüsüne ve Canlı Kontrol paneline tek tıklamalı **Koppy’yi güncelle** eylemi eklendi. Eylem yalnız Koppy'nin sabit GitHub yayın URL'sini açar; uzaktan kod çalıştırmaz.
 - 0.2.9: Canlı Kontrol üst sağda açılacak şekilde düzenlendi; panel sürüklenebilir ve sabitlenebilir oldu. Sabit değilken sayfaya tıklama paneli kapatır, sabitken hover/deneme sırasında açık kalır.
+- 0.3.0: Google aday çözümleme, Picviewer'ın eşit `src/imgSrc` sonuçlarını, lazy-load alanlarını, `picture`/`srcset` kaynaklarını ve yüklenmiş büyük preview'i kapsayacak şekilde genişletildi. Küçük Google thumbnail'ı fallback olarak hâlâ engellidir.
 - Tampermonkey kurulum sayfası Zen'de arka planda açıldı. İlk kurulumdan sonra **Automatic installation** açık olmalıdır.

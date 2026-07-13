@@ -36,7 +36,9 @@ QuickHover/Picviewer'ın çözdüğü daha iyi URL'yi, yoksa ekranda görünen g
 bir ilerleme çizgisi, sonunda da çözünürlüklü kısa “Kopyalandı” bilgisi görünür. Metin seçiliyken veya
 input/textarea/contenteditable alanındayken normal kopyalama davranışı korunur.
 
-Hover yalnız URL adayını çözer; ağ/decode işlemi `Cmd+C` öncesinde başlamaz. Koppy yalnız `https:`
+Hover yalnız URL adayını çözer; ağ/decode işlemi `Cmd+C` öncesinde başlamaz. Google'da Koppy, Picviewer'ın
+çözdüğü kaynakla birlikte bağlantı parametreleri, güncel metadata, lazy-load alanları, `picture`/`srcset` ve
+yüklenmiş büyük preview kaynağını dener. Koppy yalnız `https:`
 görselleri kabul eder; localhost/private ağ hedeflerini, yönlendirmeleri, raster olmayan yanıtları, 80 MB
 üzerindeki indirmeleri ve güvenli piksel/dimension sınırını aşan görselleri reddeder. İstekler anonim ve
 20 saniye timeout ile yapılır. Google Görseller'de gstatic thumbnail'ı hiçbir zaman “orijinal” diye

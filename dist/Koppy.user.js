@@ -12,7 +12,7 @@
 // @description:ja       画像を強力に閲覧できるツール。ポップアップ表示、拡大・縮小、回転、一括保存などの機能を自動で実行できます
 // @description:pt-BR    Poderosa ferramenta de visualização de imagens on-line, que pode pop-up/dimensionar/girar/salvar em lote imagens automaticamente
 // @description:ru       Мощный онлайн-инструмент для просмотра изображений, который может автоматически отображать/масштабировать/вращать/пакетно сохранять изображения
-// @version              0.2.9
+// @version              0.3.0
 // @icon                 data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAMAAADXqc3KAAAAV1BMVEUAAAD////29vbKysoqKioiIiKysrKhoaGTk5N9fX3z8/Pv7+/r6+vk5OTb29vOzs6Ojo5UVFQzMzMZGRkREREMDAy4uLisrKylpaV4eHhkZGRPT08/Pz/IfxjQAAAAgklEQVQoz53RRw7DIBBAUb5pxr2m3/+ckfDImwyJlL9DDzQgDIUMRu1vWOxTBdeM+onApENF0qHjpkOk2VTwLVEF40Kbfj1wK8AVu2pQA1aBBYDHJ1wy9Cf4cXD5chzNAvsAnc8TjoLAhIzsBao9w1rlVTIvkOYMd9nm6xPi168t9AYkbANdajpjcwAAAABJRU5ErkJggg==
 // @namespace            https://github.com/AbdullahPesteli/koppy
 // @homepage             https://github.com/AbdullahPesteli/koppy
@@ -36814,16 +36814,66 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
         return nodes;
     }
 
-    function imageUrlFromAttributes(element, baseUrl) {
-        const preferred = ["data-ou", "data-iurl", "data-original", "data-original-src", "data-full", "data-full-src"];
+    function imageUrlsFromAttributes(element, baseUrl) {
+        // Google, galleries and lazy loaders do not agree on a single original-image
+        // attribute. Keep every safe candidate so a stale/broken first URL can fall
+        // through to the next one during the actual Cmd+C request.
+        const preferred = [
+            "data-ou", "data-iurl", "data-original", "data-original-src", "data-original-url",
+            "data-full", "data-full-src", "data-full-url", "data-image-url", "data-zoom-image",
+            "data-src", "data-lazy-src", "data-lzy-src", "data-url",
+        ];
+        const results = [];
+        const seen = new Set();
         for (const node of elementAndAncestors(element, 6)) {
             for (const name of preferred) {
                 const value = node.getAttribute && node.getAttribute(name);
                 const normalized = normalizeCandidateUrl(value, baseUrl);
-                if (normalized && !isKnownGoogleThumbnail(normalized)) return { url: normalized, source: name };
+                if (normalized && !isKnownGoogleThumbnail(normalized) && !seen.has(normalized)) {
+                    seen.add(normalized);
+                    results.push({ url: normalized, source: name });
+                }
             }
         }
-        return null;
+        return results;
+    }
+
+    function imageUrlFromAttributes(element, baseUrl) {
+        return imageUrlsFromAttributes(element, baseUrl)[0] || null;
+    }
+
+    function imageSourceSet(element, baseUrl, includeDirectSource) {
+        const sources = [];
+        const seen = new Set();
+        const add = (raw, source) => {
+            const normalized = normalizeCandidateUrl(raw, baseUrl);
+            if (!normalized || isKnownGoogleThumbnail(normalized) || seen.has(normalized)) return;
+            seen.add(normalized);
+            sources.push({ url: normalized, source });
+        };
+        parseSrcset(element && element.getAttribute && element.getAttribute("srcset"), baseUrl)
+            .forEach(candidate => add(candidate.url, "srcset"));
+        const picture = element && element.closest && element.closest("picture");
+        if (picture && picture.querySelectorAll) {
+            picture.querySelectorAll("source[srcset]").forEach(node => {
+                parseSrcset(node.getAttribute("srcset"), baseUrl).forEach(candidate => add(candidate.url, "picture-srcset"));
+            });
+        }
+        if (includeDirectSource !== false) {
+            add(element && element.currentSrc, "currentSrc");
+            add(element && (element.src || (element.getAttribute && element.getAttribute("src"))), "src");
+        }
+        return sources;
+    }
+
+    function isLikelyLoadedPreview(element) {
+        if (!element) return false;
+        const rect = typeof element.getBoundingClientRect === "function" ? element.getBoundingClientRect() : null;
+        const width = Number(element.clientWidth || element.width || (rect && rect.width) || 0);
+        const height = Number(element.clientHeight || element.height || (rect && rect.height) || 0);
+        // Google thumbnails are commonly external CDN URLs too. Only its visibly
+        // expanded preview can safely act as a direct-source fallback.
+        return width >= 320 || height >= 240;
     }
 
     function decodeGoogleJsonString(value) {
@@ -36894,12 +36944,13 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
         };
         if (typeof settings.resolvePic === "function") {
             try {
-                const resolved = settings.resolvePic(element);
-                const current = normalizeCandidateUrl(resolved && resolved.imgSrc, baseUrl);
-                const actual = normalizeCandidateUrl(resolved && resolved.src, baseUrl);
-                if (actual && actual !== current && !isKnownGoogleThumbnail(actual)) {
-                    add(actual, "picviewer:" + (resolved.type || "unknown"));
-                }
+                const resolved = settings.resolvePic(element) || {};
+                const source = "picviewer:" + (resolved.type || "unknown");
+                // Some Picviewer rules intentionally set src and imgSrc to the same
+                // original URL. The old equality guard discarded that valid answer.
+                add(resolved.src, source);
+                if (Array.isArray(resolved.srcs)) resolved.srcs.forEach(url => add(url, source + "-srcs"));
+                add(resolved.imgSrc, "picviewer-visible");
             } catch (_) {}
         }
 
@@ -36910,11 +36961,12 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
         const fromMetadata = imageUrlFromGoogleMetadata(element, settings.document || element.ownerDocument, baseUrl);
         if (fromMetadata) add(fromMetadata.url, fromMetadata.source, { width: fromMetadata.width, height: fromMetadata.height });
 
-        const fromAttributes = imageUrlFromAttributes(element, baseUrl);
-        if (fromAttributes) add(fromAttributes.url, fromAttributes.source);
+        imageUrlsFromAttributes(element, baseUrl).forEach(candidate => add(candidate.url, candidate.source));
 
-        const srcset = parseSrcset(element.getAttribute && element.getAttribute("srcset"), baseUrl);
-        if (srcset.length) add(srcset[0].url, "srcset");
+        // A Google result can turn into a loaded, non-gstatic preview while its
+        // metadata is still late. That visible source is safe to try; known Google
+        // thumbnails remain explicitly excluded in imageSourceSet/add above.
+        imageSourceSet(element, baseUrl, isLikelyLoadedPreview(element)).forEach(candidate => add(candidate.url, candidate.source));
         return candidates;
     }
 
@@ -36946,11 +36998,8 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
             } catch (_) {}
         }
 
-        const fromAttributes = imageUrlFromAttributes(element, baseUrl);
-        if (fromAttributes) add(fromAttributes.url, fromAttributes.source);
-        parseSrcset(element.getAttribute && element.getAttribute("srcset"), baseUrl).forEach(candidate => add(candidate.url, "srcset"));
-        add(element.currentSrc, "currentSrc");
-        add(element.src || (element.getAttribute && element.getAttribute("src")), "src");
+        imageUrlsFromAttributes(element, baseUrl).forEach(candidate => add(candidate.url, candidate.source));
+        imageSourceSet(element, baseUrl).forEach(candidate => add(candidate.url, candidate.source));
         return candidates;
     }
 
