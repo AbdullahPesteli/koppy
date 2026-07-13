@@ -806,6 +806,11 @@
         const rect = typeof image.getBoundingClientRect === "function" ? image.getBoundingClientRect() : null;
         const width = Number(image.clientWidth || image.width || (rect && rect.width) || 0);
         const height = Number(image.clientHeight || image.height || (rect && rect.height) || 0);
+        // A normal image needs a meaningful footprint so we do not hijack a tiny
+        // decorative asset. Downloadable PDF/AI links are intentionally text-sized,
+        // though: Turkcell's logo cards, for example, render their PDF and AI choices
+        // as 20px-high anchors. Those are explicit copy targets, not incidental UI.
+        if (isDocumentSurface(image)) return width >= 12 && height >= 12;
         return width >= 60 && height >= 60;
     }
 

@@ -393,6 +393,43 @@ test("PDF embeds and document links are Cmd+C candidates", () => {
     assert.equal(Koppy.resolveQuickHoverImageCandidates(ai, { baseUrl: dom.window.location.href })[0].url, "https://cdn.example.test/logo.ai");
 });
 
+test("text-sized PDF and AI download links remain Cmd+C copy surfaces", async () => {
+    // The Turkcell logo page presents these choices as short text anchors, rather
+    // than as preview images. They must not be rejected by the 60×60 image filter.
+    const dom = new JSDOM(`<!doctype html><body>
+        <a id="pdf" href="https://cdn.example.test/TURKCELL_LOGO.pdf">Yatay Logo (PDF)</a>
+        <a id="ai" href="https://cdn.example.test/TURKCELL_LOGO.ai">Yatay Logo (AI)</a>
+    </body>`, { url: "https://www.turkcell.com.tr/hakkimizda/genel-bakis/turkcell-logo/detay" });
+    const document = dom.window.document;
+    const pdf = makeVisible(document.getElementById("pdf"), 166, 24);
+    const ai = makeVisible(document.getElementById("ai"), 154, 24);
+    const requested = [];
+    class ClipboardItemMock { constructor(data) { this.data = data; } }
+    const controller = Koppy.createController({
+        document,
+        window: dom.window,
+        location: dom.window.location,
+        navigator: { clipboard: { async write(items) { await items[0].data["image/png"]; } } },
+        ClipboardItem: ClipboardItemMock,
+        notify() {},
+        feedback: { start() {}, progress() {}, decoding() {}, complete() {}, fail() {} },
+        requestImage: url => {
+            requested.push(url);
+            return { promise: Promise.resolve({ blob: new Blob(["png"], { type: "image/png" }) }), abort() {} };
+        },
+        normalizeImage: async blob => ({ blob, width: 1080, height: 360 }),
+    });
+    assert.equal(controller.start(), true);
+    controller.setHoveredImage(pdf);
+    assert.equal((await controller.copyHoveredImage({ key: "c", metaKey: true, target: document.body, preventDefault() {}, stopImmediatePropagation() {} })).status, "copied");
+    controller.setHoveredImage(ai);
+    assert.equal((await controller.copyHoveredImage({ key: "c", metaKey: true, target: document.body, preventDefault() {}, stopImmediatePropagation() {} })).status, "copied");
+    assert.deepEqual(requested, [
+        "https://cdn.example.test/TURKCELL_LOGO.pdf",
+        "https://cdn.example.test/TURKCELL_LOGO.ai",
+    ]);
+});
+
 test("PDF first page is rendered to a bounded PNG without fetching a document URL", async () => {
     let options;
     let rendered = false;

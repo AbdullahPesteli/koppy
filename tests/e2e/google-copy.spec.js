@@ -307,3 +307,42 @@ test("built Koppy renders a PDF first page locally to PNG", async ({ page }) => 
     }, onePagePdfBase64());
     expect(result).toEqual({ type: "image/png", dimensions: [400, 200] });
 });
+
+test("text-sized Turkcell-style PDF and AI links accept hover + Cmd+C", async ({ page }) => {
+    await page.route("https://www.turkcell.com.tr/hakkimizda/genel-bakis/turkcell-logo/detay", route => route.fulfill({
+        status: 200,
+        contentType: "text/html",
+        body: `<!doctype html><body>
+            <a id="pdf" href="https://cdn.example.test/TURKCELL_YATAY_ERKEK_LOGO.pdf">Yatay Erkek Logo (PDF)</a>
+            <a id="ai" href="https://cdn.example.test/TURKCELL_YATAY_ERKEK_LOGO.ai">Yatay Erkek Logo (AI)</a>
+        </body>`,
+    }));
+    await page.goto("https://www.turkcell.com.tr/hakkimizda/genel-bakis/turkcell-logo/detay");
+    await page.addScriptTag({ path: modulePath });
+    await page.evaluate(() => {
+        window.__requestedLinks = [];
+        class ClipboardItemMock { constructor(data) { this.data = data; } }
+        window.__turkcellController = window.KoppyGoogleCopy.createController({
+            document,
+            window,
+            location,
+            navigator: { clipboard: { async write(items) { await items[0].data["image/png"]; } } },
+            ClipboardItem: ClipboardItemMock,
+            requestImage(url) {
+                window.__requestedLinks.push(url);
+                return { abort() {}, promise: Promise.resolve({ blob: new Blob(["png"], { type: "image/png" }) }) };
+            },
+            normalizeImage: async blob => ({ blob, width: 1080, height: 360 }),
+        });
+        window.__turkcellController.start();
+    });
+    await page.hover("#pdf");
+    await page.keyboard.press("Meta+C");
+    await expect(page.locator("#koppy-copy-toast")).toContainText("Kopyalandı: 1080×360");
+    await page.hover("#ai");
+    await page.keyboard.press("Meta+C");
+    await expect.poll(() => page.evaluate(() => window.__requestedLinks)).toEqual([
+        "https://cdn.example.test/TURKCELL_YATAY_ERKEK_LOGO.pdf",
+        "https://cdn.example.test/TURKCELL_YATAY_ERKEK_LOGO.ai",
+    ]);
+});
