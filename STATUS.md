@@ -1,20 +1,20 @@
 # Koppy — Durum
 
-**Sürüm:** 0.2.5
+**Sürüm:** 0.2.6
 **Lisans:** MIT
 **Dağıtım:** `dist/Koppy.user.js` üzerinden Tampermonkey
 
 ## Şu an
 
 - Google Görseller'de gerçek adayla, diğer sitelerde QuickHover/görünür görsel fallback'iyle `Cmd+C` sonucu `image/png` olarak panoya yazar.
-- Kopyalama görsel üzerinde ince ilerleme çizgisi ve çözünürlüklü başarı bilgisi verir; metin kopyalamayı bozmaz.
+- Kopyalama, mümkünse QuickHover'ın süzülen preview panelinde ince ilerleme çizgisi ve çözünürlüklü başarı bilgisi verir; küçük kaynak görsel yalnız ince hedef çerçevesi taşır. Metin kopyalamayı bozmaz.
 - QuickHover önizlemesi boş boyut ayarında ekranı kaplamak yerine yaklaşık ekranın %72'sine sığar; elle girilen sınır korunur.
 - Ayar arayüzü sandbox'lıdır; 91 mevcut Picviewer ayarının saklama sözleşmesini korur.
 - `@updateURL` / `@downloadURL` GitHub'daki sürüm dosyasına bağlıdır. Tampermonkey'de **Automatic installation** açık olmalıdır.
 
 ## Doğrulama
 
-- Unit/DOM: 29 test
+- Unit/DOM: 30 test
 - Browser E2E: 6 test
 - Bağımlılık denetimi: `npm audit --audit-level=high`
 
@@ -39,4 +39,5 @@
 - Public kaynak ağacı tek temiz commit olarak yayımlandı; reverse-engineering/plan notları yerelde `docs/private/` altında korundu.
 - GitHub raw yayın dosyası yerel `dist/Koppy.user.js` ile SHA-256 olarak bire bir doğrulandı.
 - 0.2.5: Wikipedia QuickHover binary copy E2E'si, görsel-üstü kopya ilerlemesi ve sınırlı QuickHover preview eklendi.
+- 0.2.6: Kopyalama geri bildirimi küçük thumbnail yerine varsa süzülen QuickHover preview'sine taşındı; kaynakta yalnız ince çerçeve kaldı.
 - Tampermonkey kurulum sayfası Zen'de arka planda açıldı. İlk kurulumdan sonra **Automatic installation** açık olmalıdır.

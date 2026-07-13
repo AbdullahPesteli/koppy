@@ -530,6 +530,33 @@
         const doc = documentLike;
         const win = windowLike || (doc && doc.defaultView);
 
+        function visibleRect(element) {
+            if (!element || typeof element.getBoundingClientRect !== "function") return null;
+            const rect = element.getBoundingClientRect();
+            if (!rect || rect.width < 1 || rect.height < 1) return null;
+            return rect;
+        }
+
+        function preferredTarget(source) {
+            if (!doc || !source) return source;
+            // QuickHover has one transient `.preview` window. Its imgbox is the visual
+            // the user is looking at, so status belongs there—not on the small result
+            // that originally triggered the hover. Never use ordinary opened windows.
+            const ownPreview = source.closest && source.closest(".pv-pic-window-container.preview");
+            if (ownPreview) {
+                const ownBox = ownPreview.querySelector(".pv-pic-window-imgbox");
+                if (visibleRect(ownBox)) return ownBox;
+            }
+            if (!doc.querySelectorAll) return source;
+            const previews = Array.from(doc.querySelectorAll(".pv-pic-window-container.preview"));
+            for (let index = previews.length - 1; index >= 0; index -= 1) {
+                const preview = previews[index];
+                const box = preview.querySelector && preview.querySelector(".pv-pic-window-imgbox");
+                if (visibleRect(box)) return box;
+            }
+            return source;
+        }
+
         function ensure() {
             if (!doc || !doc.documentElement) return null;
             if (indicator) return indicator;
@@ -558,15 +585,24 @@
             });
             root.append(fill, label);
             doc.documentElement.appendChild(root);
-            indicator = { root, fill, label, element: null };
+            const sourceOutline = doc.createElement("div");
+            sourceOutline.className = "koppy-copy-source-outline";
+            Object.assign(sourceOutline.style, {
+                position: "fixed", display: "none", pointerEvents: "none", zIndex: "2147483646",
+                boxSizing: "border-box", border: "1.5px solid #7c9cff", borderRadius: "5px",
+                boxShadow: "0 0 0 2px rgba(124,156,255,.17)", transition: "border-color 160ms ease, box-shadow 160ms ease",
+            });
+            doc.documentElement.appendChild(sourceOutline);
+            indicator = { root, fill, label, sourceOutline, element: null, source: null };
             return indicator;
         }
 
-        function place(element) {
+        function place(element, kind) {
             const item = ensure();
-            if (!item || !element || typeof element.getBoundingClientRect !== "function") return null;
-            const rect = element.getBoundingClientRect();
-            if (!rect || rect.width < 1 || rect.height < 1) return null;
+            if (!item || !element) return null;
+            const target = preferredTarget(element);
+            const rect = visibleRect(target);
+            if (!rect) return null;
             const viewportWidth = Number(win && win.innerWidth || 0);
             const left = Math.max(4, Math.min(rect.left, Math.max(4, viewportWidth - 12)));
             const width = Math.max(20, Math.min(rect.width, Math.max(20, viewportWidth - left - 4)));
@@ -575,12 +611,29 @@
                 top: Math.round(Math.max(4, rect.bottom - 4)) + "px",
                 width: Math.round(width) + "px",
             });
-            item.element = element;
+            item.element = target;
+            item.source = element;
+
+            const sourceRect = visibleRect(element);
+            if (sourceRect && target !== element) {
+                const color = kind === "error" ? "#ff7185" : kind === "success" ? "#62cf91" : "#7c9cff";
+                Object.assign(item.sourceOutline.style, {
+                    display: "block",
+                    left: Math.round(sourceRect.left - 2) + "px",
+                    top: Math.round(sourceRect.top - 2) + "px",
+                    width: Math.round(sourceRect.width + 4) + "px",
+                    height: Math.round(sourceRect.height + 4) + "px",
+                    borderColor: color,
+                    boxShadow: "0 0 0 2px " + (kind === "error" ? "rgba(255,113,133,.16)" : kind === "success" ? "rgba(98,207,145,.16)" : "rgba(124,156,255,.17)"),
+                });
+            } else {
+                item.sourceOutline.style.display = "none";
+            }
             return item;
         }
 
         function show(element, label, percent, kind) {
-            const item = place(element);
+            const item = place(element, kind);
             if (!item) return;
             clearTimeout(timer);
             item.label.textContent = label;
@@ -595,11 +648,19 @@
             decoding(element) { show(element, "Panoya hazırlanıyor", 92, "progress"); },
             complete(element, width, height) {
                 show(element, "Kopyalandı · " + width + "×" + height, 100, "success");
-                timer = setTimeout(() => { if (indicator) indicator.root.style.display = "none"; }, 1500);
+                timer = setTimeout(() => {
+                    if (!indicator) return;
+                    indicator.root.style.display = "none";
+                    indicator.sourceOutline.style.display = "none";
+                }, 1500);
             },
             fail(element, message) {
                 show(element, message || "Kopyalanamadı", 100, "error");
-                timer = setTimeout(() => { if (indicator) indicator.root.style.display = "none"; }, 2400);
+                timer = setTimeout(() => {
+                    if (!indicator) return;
+                    indicator.root.style.display = "none";
+                    indicator.sourceOutline.style.display = "none";
+                }, 2400);
             },
         };
     }

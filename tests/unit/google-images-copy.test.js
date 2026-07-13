@@ -86,6 +86,30 @@ test("QuickHover resolves any site's original first and falls back to the visibl
     assert.equal(Koppy.resolveQuickHoverImageCandidates(image, { baseUrl: dom.window.location.href })[0].url, image.src);
 });
 
+test("copy feedback moves from the source thumbnail to the visible QuickHover preview", () => {
+    const dom = new JSDOM(`<!doctype html><body>
+        <img id="source" src="https://images.example.test/thumb.jpg">
+        <span class="pv-pic-window-container preview"><span class="pv-pic-window-imgbox"><img class="pv-pic-window-pic"></span></span>
+    </body>`, { url: "https://en.wikipedia.org/wiki/Example" });
+    const document = dom.window.document;
+    const source = document.getElementById("source");
+    const previewBox = document.querySelector(".pv-pic-window-imgbox");
+    source.getBoundingClientRect = () => ({ left: 24, top: 32, right: 144, bottom: 112, width: 120, height: 80 });
+    previewBox.getBoundingClientRect = () => ({ left: 300, top: 100, right: 900, bottom: 550, width: 600, height: 450 });
+
+    const feedback = Koppy.createCopyFeedback(document, dom.window);
+    feedback.start(source);
+
+    const indicator = document.getElementById("koppy-copy-feedback");
+    const sourceOutline = document.querySelector(".koppy-copy-source-outline");
+    assert.equal(indicator.style.left, "300px");
+    assert.equal(indicator.style.top, "546px");
+    assert.equal(indicator.style.width, "600px");
+    assert.equal(sourceOutline.style.display, "block");
+    assert.equal(sourceOutline.style.left, "22px");
+    assert.equal(sourceOutline.style.top, "30px");
+});
+
 test("Cmd+C copies a QuickHover image on a non-Google site and reports on-image progress", async () => {
     const dom = new JSDOM(`<!doctype html><img id="wiki-image" width="320" height="200" src="https://upload.wikimedia.org/thumb.jpg">`, {
         url: "https://en.wikipedia.org/wiki/Example",
