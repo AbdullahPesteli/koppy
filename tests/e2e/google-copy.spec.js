@@ -5,6 +5,26 @@ const { test, expect } = require("@playwright/test");
 const modulePath = path.resolve(__dirname, "../../src/google-images-copy.js");
 const distPath = path.resolve(__dirname, "../../dist/Koppy.user.js");
 
+function onePagePdfBase64() {
+    const objects = [
+        "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
+        "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
+        "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] /Contents 4 0 R /Resources << >> >>\nendobj\n",
+        "4 0 obj\n<< /Length 28 >>\nstream\n0.9 0 0 rg\n0 0 200 100 re f\nendstream\nendobj\n",
+    ];
+    let pdf = "%PDF-1.4\n";
+    const offsets = [0];
+    for (const object of objects) {
+        offsets.push(Buffer.byteLength(pdf));
+        pdf += object;
+    }
+    const xrefOffset = Buffer.byteLength(pdf);
+    pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+    for (const offset of offsets.slice(1)) pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+    pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+    return Buffer.from(pdf).toString("base64");
+}
+
 test("hover + Cmd+C writes one 320×180 PNG and preserves input copy", async ({ page }) => {
     const pageErrors = [];
     const consoleErrors = [];
@@ -243,4 +263,47 @@ test("built Koppy userscript copies a visible QuickHover image on Wikipedia", as
         return result;
     });
     expect(clipboard).toEqual({ count: 1, types: ["image/png"], width: 360, height: 240 });
+});
+
+test("built Koppy renders a PDF first page locally to PNG", async ({ page }) => {
+    await page.route("https://example.test/pdf-copy", route => route.fulfill({ status: 200, contentType: "text/html", body: "<!doctype html><body>PDF test</body>" }));
+    await page.goto("https://example.test/pdf-copy");
+    await page.evaluate(() => {
+        const values = new Map();
+        window.GM_getValue = (key, fallback) => values.has(key) ? values.get(key) : fallback;
+        window.GM_setValue = (key, value) => values.set(key, value);
+        window.GM_deleteValue = key => values.delete(key);
+        window.GM_addStyle = () => null;
+        window.GM_openInTab = () => null;
+        window.GM_setClipboard = () => {};
+        window.GM_registerMenuCommand = () => {};
+        window.GM_notification = () => {};
+        window.GM_download = () => {};
+        window.GM_xmlhttpRequest = () => ({ abort() {} });
+        window.GM = { getValue: async (_key, fallback) => fallback, setValue: async () => {}, deleteValue: async () => {}, addStyle: window.GM_addStyle, openInTab: window.GM_openInTab, setClipboard: window.GM_setClipboard, registerMenuCommand: window.GM_registerMenuCommand, notification: window.GM_notification, xmlHttpRequest: window.GM_xmlhttpRequest };
+        window.unsafeWindow = window;
+    });
+    const built = fs.readFileSync(distPath, "utf8");
+    expect(await page.evaluate(source => {
+        try { new Function(source).call(window); return null; } catch (error) { return String(error && error.stack || error); }
+    }, built)).toBeNull();
+    const result = await page.evaluate(async base64 => {
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+        const rendered = await window.KoppyGoogleCopy.normalizeClipboardAssetToPng(new Blob([bytes], { type: "application/pdf" }), {
+            document,
+            OffscreenCanvas,
+            URL,
+            Blob,
+            maxBytes: 80 * 1024 * 1024,
+            maxPixels: 40 * 1024 * 1024,
+            maxDimension: 16384,
+        });
+        const bitmap = await createImageBitmap(rendered.blob);
+        const dimensions = [bitmap.width, bitmap.height];
+        bitmap.close();
+        return { type: rendered.blob.type, dimensions };
+    }, onePagePdfBase64());
+    expect(result).toEqual({ type: "image/png", dimensions: [400, 200] });
 });

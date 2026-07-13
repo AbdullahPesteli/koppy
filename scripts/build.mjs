@@ -19,6 +19,12 @@ const googleModuleSource = fs.readFileSync(modulePath, "utf8");
 const settingsModuleSource = fs.readFileSync(settingsModulePath, "utf8");
 const previewModuleSource = fs.readFileSync(previewModulePath, "utf8");
 const controlDeckModuleSource = fs.readFileSync(controlDeckModulePath, "utf8");
+// Keep the current, audited PDF.js modules local and pinned in the built script.
+// They are loaded as browser modules only when a PDF/AI-PDF is copied; inserting
+// ESM syntax directly into Picviewer’s legacy wrapper would make the userscript
+// fail to parse before any feature could start.
+const pdfJsSource = fs.readFileSync(path.join(root, "node_modules/pdfjs-dist/build/pdf.mjs"), "utf8");
+const pdfWorkerSource = fs.readFileSync(path.join(root, "node_modules/pdfjs-dist/build/pdf.worker.mjs"), "utf8");
 const moduleSource = `${settingsModuleSource}\n\n        globalThis.KoppySettingsUI.install({
             config: GM_config,
             document: document,
@@ -36,7 +42,7 @@ const moduleSource = `${settingsModuleSource}\n\n        globalThis.KoppySetting
             },
             onOpenState: () => { isConfigOpen = true; },
             onCloseState: () => { isConfigOpen = false; },
-        });\n\n${controlDeckModuleSource}\n\n${previewModuleSource}\n\n${googleModuleSource}`;
+});\n\n${controlDeckModuleSource}\n\n${previewModuleSource}\n\n${googleModuleSource}`;
 const runtimeHashes = new Map(fs.readFileSync(path.join(runtimeDir, "SHA256SUMS"), "utf8").trim().split("\n").map(line => {
     const match = line.match(/^([0-9a-f]{64})\s+(.+)$/);
     if (!match) throw new Error(`Invalid runtime hash line: ${line}`);
@@ -65,7 +71,7 @@ const replacements = new Map([
     ["// @name:pt-BR           Picviewer CE+", "// @name:pt-BR           Koppy"],
     ["// @name:ru              Picviewer CE+", "// @name:ru              Koppy"],
     ["// @author               NLF && ywzhaiqi && hoothin", "// @author               NLF && ywzhaiqi && hoothin; Koppy fork by pestly"],
-    ["// @version              2026.2.6.1", "// @version              0.3.3"],
+    ["// @version              2026.2.6.1", "// @version              0.4.0"],
     ["// @namespace            https://github.com/hoothin/UserScripts", "// @namespace            https://github.com/AbdullahPesteli/koppy"],
     ["// @homepage             https://pv.hoothin.com/", "// @homepage             https://github.com/AbdullahPesteli/koppy"],
     ["// @supportURL           https://github.com/hoothin/UserScripts/issues", "// @supportURL           https://github.com/AbdullahPesteli/koppy/issues"],
@@ -103,7 +109,9 @@ for (const metadataLine of upstreamContributionMetadata) {
 
 const metadataEnd = "// ==/UserScript==\n";
 if (!source.includes(metadataEnd)) throw new Error("Userscript metadata end marker missing");
-source = source.replace(metadataEnd, metadataEnd + "\n" + bundledRequires.join("\n\n") + "\n\n");
+const pdfRuntimeBootstrap = `globalThis.KoppyPdfModuleBase64 = ${JSON.stringify(Buffer.from(pdfJsSource).toString("base64"))};
+globalThis.KoppyPdfWorkerBase64 = ${JSON.stringify(Buffer.from(pdfWorkerSource).toString("base64"))};`;
+source = source.replace(metadataEnd, metadataEnd + "\n" + bundledRequires.join("\n\n") + "\n\n" + pdfRuntimeBootstrap + "\n\n");
 
 const insecureFrameMount = "document.body.appendChild((this.frame = this.create('iframe', {";
 if (!source.includes(insecureFrameMount)) throw new Error("GM_config frame mount marker missing");

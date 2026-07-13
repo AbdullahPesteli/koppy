@@ -19,5 +19,8 @@ snapshots previously referenced by Picviewer are stored under `vendor/runtime/` 
 - Picviewer CE+ rules and language data (`pvcep-rules.js`, `pvcep-lang.js`), from the upstream MIT project.
 - Video.js 8.23.3 JavaScript and CSS, Apache-2.0 (including bundled components identified by its header).
   License notice: `vendor/runtime/licenses/VIDEOJS-LICENSE.txt`.
+- PDF.js 5.4.530, Apache-2.0. It is packaged into `dist/Koppy.user.js` as local, base64-encoded
+  browser modules and is loaded only for PDF/PDF-compatible Illustrator first-page rendering. It is
+  never fetched from a third-party CDN at runtime. License: https://github.com/mozilla/pdf.js/blob/master/LICENSE
 
 The SHA-256 values used to audit the imported snapshots are recorded in `vendor/runtime/SHA256SUMS`.

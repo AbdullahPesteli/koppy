@@ -14,11 +14,27 @@
     const REQUEST_TIMEOUT_MS = 20000;
     const GOOGLE_HOSTNAMES = new Set(["google.com", "google.com.tr"]);
     const GOOGLE_METADATA_CACHE = new WeakMap();
+    // The clipboard itself gets one portable type (PNG), but the input is detected
+    // from its bytes rather than trusting a server's Content-Type/extension.
     const ALLOWED_IMAGE_TYPES = new Set([
         "image/png",
         "image/jpeg",
         "image/webp",
+        "image/gif",
+        "image/bmp",
+        "image/x-icon",
+        "image/vnd.microsoft.icon",
+        "image/avif",
+        "image/svg+xml",
     ]);
+    const DOCUMENT_TYPES = new Set([
+        "application/pdf",
+        "application/illustrator",
+        "application/postscript",
+        "application/eps",
+        "application/x-eps",
+    ]);
+    const DOCUMENT_URL_PATTERN = /\.(?:pdf|ai|eps|ps)(?:$|[?#])/i;
 
     function isGoogleHostname(hostnameLike) {
         const hostname = String(hostnameLike || "").toLowerCase();
@@ -231,6 +247,36 @@
         return entries;
     }
 
+    function documentUrlsFromElement(element, baseUrl) {
+        if (!element || !element.getAttribute) return [];
+        const tagName = String(element.nodeName || "").toUpperCase();
+        const entries = [];
+        const add = (raw, source) => {
+            const url = normalizeCandidateUrl(raw, baseUrl);
+            if (url && (DOCUMENT_URL_PATTERN.test(url) || tagName === "OBJECT" || tagName === "EMBED" || tagName === "IFRAME") && !entries.some(candidate => candidate.url === url)) {
+                entries.push({ url, source, documentCandidate: true });
+            }
+        };
+        if (tagName === "OBJECT") add(element.data || element.getAttribute("data"), "object-data");
+        if (tagName === "EMBED" || tagName === "IFRAME") add(element.src || element.getAttribute("src"), tagName.toLowerCase() + "-src");
+        if (tagName === "A") add(element.href || element.getAttribute("href"), "document-link");
+        const anchor = element.closest && element.closest("a[href]");
+        if (anchor && anchor !== element) add(anchor.href, "document-link");
+        return entries;
+    }
+
+    function isDocumentSurface(element) {
+        if (!element || element.nodeType !== 1 || element.isConnected === false) return false;
+        const tagName = String(element.nodeName || "").toUpperCase();
+        if (tagName === "OBJECT" || tagName === "EMBED" || tagName === "IFRAME") return documentUrlsFromElement(element, element.ownerDocument && element.ownerDocument.baseURI).length > 0;
+        if (tagName === "A" && element.hasAttribute("download")) return true;
+        return documentUrlsFromElement(element, element.ownerDocument && element.ownerDocument.baseURI).length > 0;
+    }
+
+    function isCopySurface(element) {
+        return isImageSurface(element) || isDocumentSurface(element);
+    }
+
     function isImageSurface(element) {
         if (!element || element.nodeType !== 1 || element.isConnected === false) return false;
         const tagName = String(element.nodeName || "").toUpperCase();
@@ -359,7 +405,7 @@
 
     function resolveQuickHoverImageCandidates(element, options) {
         const settings = options || {};
-        if (!isImageSurface(element)) return [];
+        if (!isCopySurface(element)) return [];
         const baseUrl = settings.baseUrl || (element.ownerDocument && element.ownerDocument.baseURI) || "https://example.invalid/";
         const candidates = [];
         const seen = new Set();
@@ -385,6 +431,7 @@
         imageUrlsFromMediaElement(element, baseUrl).forEach(candidate => add(candidate.url, candidate.source));
         imageUrlsFromBackground(element, baseUrl).forEach(candidate => add(candidate.url, candidate.source));
         if (String(element.nodeName).toUpperCase() === "IMG") imageSourceSet(element, baseUrl, true, false).forEach(candidate => add(candidate.url, candidate.source, candidate));
+        documentUrlsFromElement(element, baseUrl).forEach(candidate => add(candidate.url, candidate.source, candidate));
         return candidates;
     }
 
@@ -396,6 +443,11 @@
             headers[line.slice(0, separator).trim().toLowerCase()] = line.slice(separator + 1).trim();
         });
         return headers;
+    }
+
+    function isCopyableDeclaredType(mime) {
+        if (!mime || mime === "application/octet-stream" || mime === "binary/octet-stream") return true;
+        return ALLOWED_IMAGE_TYPES.has(mime) || DOCUMENT_TYPES.has(mime) || mime.startsWith("image/");
     }
 
     function requestImageWithGM(url, gmRequest, options) {
@@ -445,7 +497,10 @@
                         if (!blob || typeof blob.size !== "number" || blob.size === 0) throw new Error("Görsel yanıtı boş");
                         if (blob.size > maxBytes) throw new Error("Görsel " + Math.round(maxBytes / 1024 / 1024) + " MB güvenlik sınırını aşıyor");
                         const mime = String(blob.type || headers["content-type"] || "").split(";", 1)[0].toLowerCase();
-                        if (!ALLOWED_IMAGE_TYPES.has(mime)) throw new Error("Desteklenmeyen görsel türü: " + (mime || "bilinmiyor"));
+                        // Servers frequently label AI/PDF and newer image formats as
+                        // octet-stream. Accept only potential media here; byte-signature
+                        // validation happens before decoding below.
+                        if (!isCopyableDeclaredType(mime)) throw new Error("Bu yanıt bir görsel veya belge değil: " + (mime || "bilinmiyor"));
                         settled = true;
                         resolve({ blob: blob.type === mime ? blob : new Blob([blob], { type: mime }), finalUrl });
                     } catch (error) {
@@ -463,6 +518,43 @@
                 if (requestHandle && typeof requestHandle.abort === "function") requestHandle.abort();
             },
         };
+    }
+
+    function ascii(bytes, start, length) {
+        return String.fromCharCode(...bytes.slice(start, start + length));
+    }
+
+    function hasPdfSignature(bytes) {
+        // Illustrator files saved with PDF compatibility have a normal PDF header.
+        return ascii(bytes, 0, 5) === "%PDF-";
+    }
+
+    function hasPostscriptSignature(bytes) {
+        return ascii(bytes, 0, 2) === "%!" && /^(?:%!PS|%!Adobe)/.test(ascii(bytes, 0, 32));
+    }
+
+    async function detectClipboardAsset(blob) {
+        const bytes = new Uint8Array(await blob.slice(0, 8192).arrayBuffer());
+        const declared = String(blob.type || "").split(";", 1)[0].toLowerCase();
+        const startsText = ascii(bytes, 0, Math.min(bytes.length, 512)).replace(/^\uFEFF/, "").trimStart();
+        const raster = mime => ({ kind: "raster", mime, label: mime });
+        if (bytes.length >= 8 && bytes[0] === 0x89 && ascii(bytes, 1, 3) === "PNG") return raster("image/png");
+        if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return raster("image/jpeg");
+        if (bytes.length >= 12 && ascii(bytes, 0, 4) === "RIFF" && ascii(bytes, 8, 4) === "WEBP") return raster("image/webp");
+        if (bytes.length >= 10 && (ascii(bytes, 0, 6) === "GIF87a" || ascii(bytes, 0, 6) === "GIF89a")) return raster("image/gif");
+        if (bytes.length >= 26 && bytes[0] === 0x42 && bytes[1] === 0x4d) return raster("image/bmp");
+        if (bytes.length >= 8 && bytes[0] === 0 && bytes[1] === 0 && (bytes[2] === 1 || bytes[2] === 2) && bytes[3] === 0) return raster("image/x-icon");
+        if (bytes.length >= 12 && ascii(bytes, 4, 4) === "ftyp") {
+            const brand = ascii(bytes, 8, 4).toLowerCase();
+            if (/^(?:avif|avis|mif1|msf1)$/.test(brand)) return raster("image/avif");
+            if (/^(?:heic|heix|hevc|hevx)$/.test(brand)) return raster("image/heic");
+        }
+        if (/^<svg(?:\s|>)/i.test(startsText) || /^<\?xml[\s\S]{0,256}<svg(?:\s|>)/i.test(startsText)) return raster("image/svg+xml");
+        if (hasPdfSignature(bytes)) return { kind: "pdf", mime: "application/pdf", label: declared === "application/illustrator" ? "AI (PDF uyumlu)" : "PDF" };
+        if (hasPostscriptSignature(bytes)) return { kind: "postscript", mime: declared || "application/postscript", label: declared === "application/illustrator" || /illustrator/i.test(startsText) ? "AI/PostScript" : "PostScript/EPS" };
+        if (ALLOWED_IMAGE_TYPES.has(declared)) return raster(declared);
+        if (DOCUMENT_TYPES.has(declared)) return { kind: declared === "application/pdf" ? "pdf" : "postscript", mime: declared, label: declared };
+        return { kind: "unknown", mime: declared || "bilinmiyor", label: declared || "bilinmeyen veri" };
     }
 
     async function probeRasterDimensions(blob) {
@@ -504,6 +596,13 @@
                 return { width: 1 + (bits & 0x3fff), height: 1 + (bits >>> 14 & 0x3fff) };
             }
         }
+        if (mime === "image/gif" && bytes.length >= 10 && (ascii(bytes, 0, 6) === "GIF87a" || ascii(bytes, 0, 6) === "GIF89a")) {
+            return { width: view.getUint16(6, true), height: view.getUint16(8, true) };
+        }
+        if (mime === "image/bmp" && bytes.length >= 26 && bytes[0] === 0x42 && bytes[1] === 0x4d) {
+            const dibSize = view.getUint32(14, true);
+            if (dibSize >= 40 && bytes.length >= 26) return { width: Math.abs(view.getInt32(18, true)), height: Math.abs(view.getInt32(22, true)) };
+        }
         throw new Error("Görsel başlığı güvenli biçimde doğrulanamadı");
     }
 
@@ -516,10 +615,7 @@
         }
     }
 
-    async function imageBitmapToPng(bitmap, environment) {
-        const width = bitmap.width;
-        const height = bitmap.height;
-        validateImageDimensions(width, height, environment);
+    function createOutputCanvas(width, height, environment) {
         let canvas;
         if (environment.OffscreenCanvas) {
             canvas = new environment.OffscreenCanvas(width, height);
@@ -532,7 +628,10 @@
         }
         const context = canvas.getContext("2d");
         if (!context) throw new Error("PNG dönüştürme yüzeyi açılamadı");
-        context.drawImage(bitmap, 0, 0);
+        return { canvas, context };
+    }
+
+    async function canvasToPng(canvas, environment) {
         let png;
         if (typeof canvas.convertToBlob === "function") {
             png = await canvas.convertToBlob({ type: "image/png" });
@@ -542,24 +641,146 @@
         if (!png || png.size > Number(environment.maxBytes || MAX_IMAGE_BYTES)) {
             throw new Error("Üretilen PNG güvenli boyut sınırını aşıyor");
         }
-        return { blob: png, width, height };
+        return png;
+    }
+
+    async function imageBitmapToPng(bitmap, environment) {
+        const width = bitmap.width;
+        const height = bitmap.height;
+        validateImageDimensions(width, height, environment);
+        const output = createOutputCanvas(width, height, environment);
+        output.context.drawImage(bitmap, 0, 0);
+        return { blob: await canvasToPng(output.canvas, environment), width, height };
     }
 
     async function normalizeImageToPng(blob, environment) {
         const env = environment || {};
         const probeDimensions = env.probeDimensions || probeRasterDimensions;
-        const headerDimensions = await probeDimensions(blob);
-        validateImageDimensions(headerDimensions.width, headerDimensions.height, env);
+        const detected = env.detectAsset ? await env.detectAsset(blob) : await detectClipboardAsset(blob);
+        if (!detected || detected.kind !== "raster") {
+            throw new Error("Bu veri tarayıcıda çözülebilen bir görsel değil: " + (detected && detected.label || "bilinmiyor"));
+        }
+        const normalizedInput = blob.type === detected.mime ? blob : new Blob([blob], { type: detected.mime });
+        try {
+            const headerDimensions = await probeDimensions(normalizedInput);
+            validateImageDimensions(headerDimensions.width, headerDimensions.height, env);
+        } catch (error) {
+            if (!["image/avif", "image/x-icon", "image/vnd.microsoft.icon", "image/svg+xml", "image/heic"].includes(detected.mime)) throw error;
+        }
         const createBitmap = env.createImageBitmap || (typeof createImageBitmap === "function" ? createImageBitmap : null);
         if (!createBitmap) throw new Error("Tarayıcı görsel çözücüsü kullanılamıyor");
-        const bitmap = await createBitmap(blob);
+        let bitmap;
+        try {
+            bitmap = await createBitmap(normalizedInput);
+        } catch (_) {
+            throw new Error("Tarayıcı bu görsel biçimini çözemiyor: " + detected.mime);
+        }
         try {
             validateImageDimensions(bitmap.width, bitmap.height, env);
-            if (blob.type === "image/png") return { blob, width: bitmap.width, height: bitmap.height };
+            if (detected.mime === "image/png") return { blob: normalizedInput, width: bitmap.width, height: bitmap.height };
             return await imageBitmapToPng(bitmap, env);
         } finally {
             if (bitmap && typeof bitmap.close === "function") bitmap.close();
         }
+    }
+
+    let pdfModulePromise = null;
+    let pdfWorkerUrl = null;
+
+    function decodeBundledModule(base64) {
+        if (typeof base64 !== "string" || !base64) return null;
+        if (typeof atob !== "function" || typeof TextDecoder !== "function") throw new Error("PDF çözücü kodu okunamadı");
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+        return new TextDecoder().decode(bytes);
+    }
+
+    async function loadBundledPdfJs(environment) {
+        if (typeof globalThis !== "undefined" && globalThis.KoppyPdfjs) return globalThis.KoppyPdfjs;
+        if (pdfModulePromise) return pdfModulePromise;
+        const UrlCtor = environment.URL || (typeof URL === "function" ? URL : null);
+        const BlobCtor = environment.Blob || (typeof Blob === "function" ? Blob : null);
+        const source = environment.pdfModuleSource || decodeBundledModule(environment.pdfModuleBase64 || (typeof globalThis !== "undefined" && globalThis.KoppyPdfModuleBase64));
+        if (!UrlCtor || !BlobCtor || !source) throw new Error("PDF çözücüsü yüklenemedi");
+        const moduleUrl = UrlCtor.createObjectURL(new BlobCtor([source], { type: "text/javascript" }));
+        pdfModulePromise = import(moduleUrl).then(pdfjsLib => {
+            if (typeof globalThis !== "undefined") globalThis.KoppyPdfjs = pdfjsLib;
+            return pdfjsLib;
+        }).catch(error => {
+            pdfModulePromise = null;
+            throw error;
+        }).finally(() => UrlCtor.revokeObjectURL(moduleUrl));
+        return pdfModulePromise;
+    }
+
+    function ensurePdfWorker(environment, pdfjsLib) {
+        if (!pdfjsLib.GlobalWorkerOptions) throw new Error("PDF çözücü worker ayarı kullanılamıyor");
+        if (pdfWorkerUrl) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+            return;
+        }
+        const UrlCtor = environment.URL || (typeof URL === "function" ? URL : null);
+        const BlobCtor = environment.Blob || (typeof Blob === "function" ? Blob : null);
+        const source = environment.pdfWorkerSource || decodeBundledModule(environment.pdfWorkerBase64 || (typeof globalThis !== "undefined" && globalThis.KoppyPdfWorkerBase64));
+        if (!UrlCtor || !BlobCtor || !source) throw new Error("PDF çözücü worker'ı başlatılamıyor");
+        pdfWorkerUrl = UrlCtor.createObjectURL(new BlobCtor([source], { type: "text/javascript" }));
+        pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+    }
+
+    async function renderPdfToPng(blob, environment) {
+        const env = environment || {};
+        const pdfjsLib = env.pdfjsLib || await loadBundledPdfJs(env);
+        if (!pdfjsLib || typeof pdfjsLib.getDocument !== "function") throw new Error("PDF çözücüsü yüklenemedi");
+        ensurePdfWorker(env, pdfjsLib);
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        let loadingTask;
+        let documentProxy;
+        try {
+            loadingTask = pdfjsLib.getDocument({
+                data: bytes,
+                disableRange: true,
+                disableStream: true,
+                disableAutoFetch: true,
+                isEvalSupported: false,
+                useWorkerFetch: false,
+                enableXfa: false,
+                stopAtErrors: true,
+            });
+            documentProxy = await loadingTask.promise;
+            const page = await documentProxy.getPage(1);
+            const naturalViewport = page.getViewport({ scale: 1 });
+            const naturalWidth = Number(naturalViewport.width);
+            const naturalHeight = Number(naturalViewport.height);
+            if (!naturalWidth || !naturalHeight) throw new Error("PDF ilk sayfa boyutu okunamadı");
+            const maxDimension = Number(env.maxDimension || MAX_IMAGE_DIMENSION);
+            const maxPixels = Number(env.maxPixels || MAX_IMAGE_PIXELS);
+            const scale = Math.min(2, maxDimension / Math.max(naturalWidth, naturalHeight), Math.sqrt(maxPixels / (naturalWidth * naturalHeight)));
+            if (!Number.isFinite(scale) || scale <= 0) throw new Error("PDF ilk sayfası güvenli piksel sınırını aşıyor");
+            const viewport = page.getViewport({ scale });
+            const width = Math.max(1, Math.ceil(viewport.width));
+            const height = Math.max(1, Math.ceil(viewport.height));
+            validateImageDimensions(width, height, env);
+            const output = createOutputCanvas(width, height, env);
+            await page.render({ canvasContext: output.context, viewport }).promise;
+            return { blob: await canvasToPng(output.canvas, env), width, height, documentType: "pdf" };
+        } catch (error) {
+            const message = error && error.message ? error.message : "PDF çözülemedi";
+            throw new Error("PDF ilk sayfası kopyalanamadı: " + message);
+        } finally {
+            if (documentProxy && typeof documentProxy.destroy === "function") await documentProxy.destroy();
+            else if (loadingTask && typeof loadingTask.destroy === "function") await loadingTask.destroy();
+        }
+    }
+
+    async function normalizeClipboardAssetToPng(blob, environment) {
+        const detected = await detectClipboardAsset(blob);
+        if (detected.kind === "raster") return normalizeImageToPng(blob, Object.assign({}, environment, { detectAsset: async () => detected }));
+        if (detected.kind === "pdf") return renderPdfToPng(blob, environment);
+        if (detected.kind === "postscript") {
+            throw new Error(detected.label + " dosyası PDF uyumlu değil. Bu AI/EPS çeşidi tarayıcıda güvenli biçimde render edilemiyor");
+        }
+        throw new Error("Bilinmeyen dosya biçimi: " + detected.label);
     }
 
     function isEditableTarget(target) {
@@ -581,7 +802,7 @@
     }
 
     function isLikelyResultImage(image) {
-        if (!isImageSurface(image)) return false;
+        if (!isCopySurface(image)) return false;
         const rect = typeof image.getBoundingClientRect === "function" ? image.getBoundingClientRect() : null;
         const width = Number(image.clientWidth || image.width || (rect && rect.width) || 0);
         const height = Number(image.clientHeight || image.height || (rect && rect.height) || 0);
@@ -797,10 +1018,18 @@
         const ClipboardItemCtor = deps.ClipboardItem || (windowLike && windowLike.ClipboardItem);
         const notify = deps.notify || createToast(documentLike);
         const feedback = deps.feedback || createCopyFeedback(documentLike, windowLike);
-        const normalizeImage = deps.normalizeImage || (blob => normalizeImageToPng(blob, {
+        const normalizeImage = deps.normalizeImage || (blob => normalizeClipboardAssetToPng(blob, {
             createImageBitmap: windowLike && windowLike.createImageBitmap && windowLike.createImageBitmap.bind(windowLike),
             OffscreenCanvas: windowLike && windowLike.OffscreenCanvas,
             document: documentLike,
+            Worker: windowLike && windowLike.Worker,
+            URL: windowLike && windowLike.URL,
+            Blob: windowLike && windowLike.Blob,
+            pdfjsLib: deps.pdfjsLib,
+            pdfModuleSource: deps.pdfModuleSource,
+            pdfModuleBase64: deps.pdfModuleBase64,
+            pdfWorkerSource: deps.pdfWorkerSource,
+            pdfWorkerBase64: deps.pdfWorkerBase64,
             maxBytes: deps.maxBytes || MAX_IMAGE_BYTES,
             maxPixels: deps.maxPixels || MAX_IMAGE_PIXELS,
             maxDimension: deps.maxDimension || MAX_IMAGE_DIMENSION,
@@ -877,7 +1106,7 @@
 
         function surfaceFromNodes(nodes) {
             for (const node of nodes || []) {
-                if (isImageSurface(node)) return node;
+                if (isCopySurface(node)) return node;
             }
             return null;
         }
@@ -886,7 +1115,7 @@
             let current = node;
             let remaining = 8;
             while (current && remaining-- > 0) {
-                if (isImageSurface(current)) return current;
+                if (isCopySurface(current)) return current;
                 current = current.parentElement || (current.getRootNode && current.getRootNode().host) || null;
             }
             return null;
@@ -1091,17 +1320,20 @@
         createController,
         createCopyFeedback,
         createToast,
+        detectClipboardAsset,
         isCopyGesture,
         isGoogleImagesLocation,
         isKnownGoogleThumbnail,
         isPrivateHost,
         normalizeCandidateUrl,
+        normalizeClipboardAssetToPng,
         normalizeImageToPng,
         parseGoogleImageUrl,
         parseSrcset,
         prepareClipboardImage,
         probeRasterDimensions,
         requestImageWithGM,
+        renderPdfToPng,
         resolveGoogleImage,
         resolveGoogleImageCandidates,
         resolveQuickHoverImageCandidates,

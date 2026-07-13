@@ -1,12 +1,13 @@
 # Koppy — Durum
 
-**Sürüm:** 0.3.3
+**Sürüm:** 0.4.0
 **Lisans:** MIT
 **Dağıtım:** `dist/Koppy.user.js` üzerinden Tampermonkey
 
 ## Şu an
 
-- Google Görseller'de Picviewer sonucu, bağlantı/metaveri/lazy-load alanları, `picture`/`srcset` ve büyük yüklenmiş preview adaylarını sıralayarak; diğer sitelerde QuickHover/görünür görsel fallback'iyle `Cmd+C` sonucu `image/png` olarak panoya yazar. Görünür CSS `background-image`, video `poster` ve SVG `<image>` yüzeyleri de adaydır.
+- Google Görseller'de Picviewer sonucu, bağlantı/metaveri/lazy-load alanları, `picture`/`srcset` ve büyük yüklenmiş preview adaylarını sıralayarak; diğer sitelerde QuickHover/görünür görsel fallback'iyle `Cmd+C` sonucu `image/png` olarak panoya yazar. Görünür CSS `background-image`, video `poster`, SVG `<image>`, PDF `embed/object/iframe` ve indirilebilir PDF/AI bağlantıları da adaydır.
+- Girdi imzasından PNG/JPEG/WebP/GIF/BMP/ICO/AVIF/SVG tanınır. PDF ve PDF-uyumlu AI dosyasının yalnız ilk sayfası yerelde PNG olarak render edilir. Saf PostScript AI/EPS, PSD/RAW gibi browser-decoder dışı formatlarda yanlış bir görüntü yerine açık hata verilir; tam kapsam için opt-in yerel bridge gerekir.
 - Kopyalama, mümkünse QuickHover'ın süzülen preview panelinde ince ilerleme çizgisi ve çözünürlüklü başarı bilgisi verir; küçük kaynak görsel yalnız ince hedef çerçevesi taşır. Metin kopyalamayı bozmaz.
 - QuickHover önizlemesi boş boyut ayarında ekranı kaplamak yerine yaklaşık ekranın %72'sine sığar; elle girilen sınır korunur.
 - Tampermonkey menüsündeki **Koppy Canlı Kontrol**, sık kullanılan modifier, FloatBar konumu ve preview boyutunu küçük bir panelden gerçek davranışa anında uygular. Panel üst sağda açılır, başlığından sürüklenebilir; **sabitle** açıkken sayfada deneme yaparken kapanmaz. Aynı paneldeki **Koppy’yi güncelle** eylemi Tampermonkey güncelleme sayfasını doğrudan açar.
@@ -15,8 +16,8 @@
 
 ## Doğrulama
 
-- Unit/DOM: 39 test
-- Browser E2E: 8 test
+- Unit/DOM: 43 test
+- Browser E2E: 9 test (gerçek PDF.js render → PNG dahil)
 - Bağımlılık denetimi: `npm audit --audit-level=high`
 
 ## Sıradaki
@@ -48,4 +49,5 @@
 - 0.3.1: Açık kaynak taramasıyla MaxURL (Apache-2.0), Image Downloader (lisans yok), KellyC (GPL-3.0) ve Imagus Reborn (lisans yok) değerlendirildi. Koppy'ye bağımsız CSS `background-image`, video `poster` ve SVG `<image>` adayları eklendi; 39 unit + 8 browser E2E test geçti. Ayrıntılı araştırma notu yerel `docs/private/` altında tutulur.
 - 0.3.2: Google yalnız encrypted thumbnail veriyorsa hata yerine gerçek thumbnail piksellerini kopyalar; başarı bildirimi bunu açıkça **Önizleme kopyalandı** diye belirtir. Orijinal aday her zaman önce denenir.
 - 0.3.3: Doğrudan açık Google thumbnail sekmesi de genel görsel olarak kopyalanabilir; yine **Önizleme kopyalandı** etiketi taşır.
+- 0.4.0: Güncel ve denetlenen PDF.js 5.4.530 yalnız PDF/AI-PDF kopyası istendiğinde yerel Blob module olarak yüklenir; PDF/uyumlu-AI ilk sayfası 2× hedef ölçekle, güvenli boyut/piksel sınırları içinde `image/png` olur. Eski PostScript AI/EPS açıkça ayrılır. 43 unit ve 9 browser E2E testi geçti; E2E gerçek PDF render'ını ve çıktı pikselini doğrular.
 - Tampermonkey kurulum sayfası Zen'de arka planda açıldı. İlk kurulumdan sonra **Automatic installation** açık olmalıdır.

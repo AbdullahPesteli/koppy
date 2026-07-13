@@ -292,7 +292,7 @@ test("GM request validates status, MIME, size and redirect target", async () => 
         queueMicrotask(() => options.onload({ status: 200, response: new Blob(["x"], { type: "text/html" }), finalUrl: options.url }));
         return { abort() {} };
     });
-    await assert.rejects(nonImage.promise, /Desteklenmeyen görsel türü/);
+    await assert.rejects(nonImage.promise, /görsel veya belge değil/);
 
     const oversized = Koppy.requestImageWithGM("https://images.example.test/huge.png", options => {
         queueMicrotask(() => options.onload({
@@ -364,6 +364,76 @@ test("PNG is preserved, JPEG/WebP are converted, and pixel bombs are rejected", 
         OffscreenCanvas: FakeCanvas,
     }), /piksel sınırını/);
     assert.equal(hugeDecodeStarted, false);
+});
+
+test("file signatures recognize browser images, PDF-compatible AI and legacy AI/EPS separately", async () => {
+    const gif = new Uint8Array(10);
+    gif.set(Buffer.from("GIF89a"));
+    new DataView(gif.buffer).setUint16(6, 640, true);
+    new DataView(gif.buffer).setUint16(8, 360, true);
+    assert.deepEqual(await Koppy.detectClipboardAsset(new Blob([gif], { type: "application/octet-stream" })), {
+        kind: "raster", mime: "image/gif", label: "image/gif",
+    });
+    assert.equal((await Koppy.detectClipboardAsset(new Blob(["%PDF-1.7\n"], { type: "application/illustrator" }))).kind, "pdf");
+    const oldAi = await Koppy.detectClipboardAsset(new Blob(["%!PS-Adobe-3.0\n%%Creator: Adobe Illustrator\n"], { type: "application/illustrator" }));
+    assert.equal(oldAi.kind, "postscript");
+    assert.equal(oldAi.label, "AI/PostScript");
+    assert.equal((await Koppy.detectClipboardAsset(new Blob(["not a media file"], { type: "application/octet-stream" }))).kind, "unknown");
+    assert.deepEqual(await Koppy.probeRasterDimensions(new Blob([gif], { type: "image/gif" })), { width: 640, height: 360 });
+});
+
+test("PDF embeds and document links are Cmd+C candidates", () => {
+    const dom = new JSDOM(`<!doctype html><body>
+        <embed id="pdf" src="https://cdn.example.test/layout.pdf">
+        <a id="ai" href="https://cdn.example.test/logo.ai" download>logo.ai</a>
+    </body>`, { url: "https://example.test/work" });
+    const pdf = makeVisible(dom.window.document.getElementById("pdf"), 480, 640);
+    const ai = makeVisible(dom.window.document.getElementById("ai"), 160, 80);
+    assert.equal(Koppy.resolveQuickHoverImageCandidates(pdf, { baseUrl: dom.window.location.href })[0].url, "https://cdn.example.test/layout.pdf");
+    assert.equal(Koppy.resolveQuickHoverImageCandidates(ai, { baseUrl: dom.window.location.href })[0].url, "https://cdn.example.test/logo.ai");
+});
+
+test("PDF first page is rendered to a bounded PNG without fetching a document URL", async () => {
+    let options;
+    let rendered = false;
+    class FakeCanvas {
+        constructor(width, height) { this.width = width; this.height = height; }
+        getContext() { return { fillRect() {} }; }
+        async convertToBlob() { return new Blob(["png"], { type: "image/png" }); }
+    }
+    const pdfjsLib = {
+        GlobalWorkerOptions: { workerPort: null },
+        getDocument(value) {
+            options = value;
+            return {
+                promise: Promise.resolve({
+                    async getPage() {
+                        return {
+                            getViewport({ scale }) { return { width: 300 * scale, height: 200 * scale }; },
+                            render() { rendered = true; return { promise: Promise.resolve() }; },
+                        };
+                    },
+                    async destroy() {},
+                }),
+                async destroy() {},
+            };
+        },
+    };
+    const output = await Koppy.renderPdfToPng(new Blob(["%PDF-1.7\n"], { type: "application/pdf" }), {
+        pdfjsLib,
+        OffscreenCanvas: FakeCanvas,
+        URL: { createObjectURL() { return "blob:koppy-pdf-worker"; }, revokeObjectURL() {} },
+        Blob,
+        pdfWorkerSource: "self.postMessage('ready')",
+        maxPixels: 1000000,
+        maxDimension: 2000,
+    });
+    assert.equal(pdfjsLib.GlobalWorkerOptions.workerSrc, "blob:koppy-pdf-worker");
+    assert.equal(rendered, true);
+    assert.equal(options.disableRange, true);
+    assert.equal(options.disableAutoFetch, true);
+    assert.equal(options.isEvalSupported, false);
+    assert.deepEqual([output.width, output.height, output.blob.type], [600, 400, "image/png"]);
 });
 
 test("PNG, JPEG and WebP dimensions are validated from headers before decode", async () => {
