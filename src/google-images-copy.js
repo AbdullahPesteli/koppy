@@ -34,7 +34,10 @@
         "application/eps",
         "application/x-eps",
     ]);
-    const DOCUMENT_URL_PATTERN = /\.(?:pdf|ai|eps|ps)(?:$|[?#])/i;
+    // A number of asset libraries use text-only download links rather than an
+    // <img>. Include ordinary image-file links too; the response is still
+    // signature-checked before it ever reaches the clipboard.
+    const COPYABLE_FILE_URL_PATTERN = /\.(?:pdf|ai|eps|ps|svg|png|apng|jpe?g|webp|gif|bmp|ico|avif|heic)(?:$|[?#])/i;
 
     function isGoogleHostname(hostnameLike) {
         const hostname = String(hostnameLike || "").toLowerCase();
@@ -251,17 +254,17 @@
         if (!element || !element.getAttribute) return [];
         const tagName = String(element.nodeName || "").toUpperCase();
         const entries = [];
-        const add = (raw, source) => {
+        const add = (raw, source, explicitDownload) => {
             const url = normalizeCandidateUrl(raw, baseUrl);
-            if (url && (DOCUMENT_URL_PATTERN.test(url) || tagName === "OBJECT" || tagName === "EMBED" || tagName === "IFRAME") && !entries.some(candidate => candidate.url === url)) {
+            if (url && (COPYABLE_FILE_URL_PATTERN.test(url) || explicitDownload || tagName === "OBJECT" || tagName === "EMBED" || tagName === "IFRAME") && !entries.some(candidate => candidate.url === url)) {
                 entries.push({ url, source, documentCandidate: true });
             }
         };
         if (tagName === "OBJECT") add(element.data || element.getAttribute("data"), "object-data");
         if (tagName === "EMBED" || tagName === "IFRAME") add(element.src || element.getAttribute("src"), tagName.toLowerCase() + "-src");
-        if (tagName === "A") add(element.href || element.getAttribute("href"), "document-link");
+        if (tagName === "A") add(element.href || element.getAttribute("href"), "document-link", element.hasAttribute("download"));
         const anchor = element.closest && element.closest("a[href]");
-        if (anchor && anchor !== element) add(anchor.href, "document-link");
+        if (anchor && anchor !== element) add(anchor.href, "document-link", anchor.hasAttribute("download"));
         return entries;
     }
 

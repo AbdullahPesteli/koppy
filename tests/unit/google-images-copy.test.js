@@ -417,6 +417,17 @@ test("PDF embeds and document links are Cmd+C candidates", () => {
     assert.equal(Koppy.resolveQuickHoverImageCandidates(ai, { baseUrl: dom.window.location.href })[0].url, "https://cdn.example.test/logo.ai");
 });
 
+test("text download links accept SVG/image extensions and extensionless download URLs", () => {
+    const dom = new JSDOM(`<!doctype html><body>
+        <a id="svg" href="https://cdn.example.test/brand.svg">Brand assets (SVG)</a>
+        <a id="signed" href="https://storage.example.test/download?id=brand" download>Brand download</a>
+    </body>`, { url: "https://example.test/assets" });
+    const svg = makeVisible(dom.window.document.getElementById("svg"), 140, 22);
+    const signed = makeVisible(dom.window.document.getElementById("signed"), 140, 22);
+    assert.equal(Koppy.resolveQuickHoverImageCandidates(svg, { baseUrl: dom.window.location.href })[0].url, "https://cdn.example.test/brand.svg");
+    assert.equal(Koppy.resolveQuickHoverImageCandidates(signed, { baseUrl: dom.window.location.href })[0].url, "https://storage.example.test/download?id=brand");
+});
+
 test("text-sized PDF and AI download links remain Cmd+C copy surfaces", async () => {
     // The Turkcell logo page presents these choices as short text anchors, rather
     // than as preview images. They must not be rejected by the 60×60 image filter.
