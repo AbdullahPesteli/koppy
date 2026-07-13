@@ -12,7 +12,7 @@
 // @description:ja       画像を強力に閲覧できるツール。ポップアップ表示、拡大・縮小、回転、一括保存などの機能を自動で実行できます
 // @description:pt-BR    Poderosa ferramenta de visualização de imagens on-line, que pode pop-up/dimensionar/girar/salvar em lote imagens automaticamente
 // @description:ru       Мощный онлайн-инструмент для просмотра изображений, который может автоматически отображать/масштабировать/вращать/пакетно сохранять изображения
-// @version              0.3.1
+// @version              0.3.2
 // @icon                 data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAMAAADXqc3KAAAAV1BMVEUAAAD////29vbKysoqKioiIiKysrKhoaGTk5N9fX3z8/Pv7+/r6+vk5OTb29vOzs6Ojo5UVFQzMzMZGRkREREMDAy4uLisrKylpaV4eHhkZGRPT08/Pz/IfxjQAAAAgklEQVQoz53RRw7DIBBAUb5pxr2m3/+ckfDImwyJlL9DDzQgDIUMRu1vWOxTBdeM+onApENF0qHjpkOk2VTwLVEF40Kbfj1wK8AVu2pQA1aBBYDHJ1wy9Cf4cXD5chzNAvsAnc8TjoLAhIzsBao9w1rlVTIvkOYMd9nm6xPi168t9AYkbANdajpjcwAAAABJRU5ErkJggg==
 // @namespace            https://github.com/AbdullahPesteli/koppy
 // @homepage             https://github.com/AbdullahPesteli/koppy
@@ -37015,6 +37015,15 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
         // metadata is still late. That visible source is safe to try; known Google
         // thumbnails remain explicitly excluded in imageSourceSet/add above.
         imageSourceSet(element, baseUrl, isLikelyLoadedPreview(element)).forEach(candidate => add(candidate.url, candidate.source));
+        // A Google result sometimes exposes only its encrypted thumbnail. It is not an
+        // original, but it is still a real image the user can explicitly choose to copy.
+        // Keep it strictly last and label it, so we never pretend it is high resolution.
+        if (!candidates.length) {
+            const thumbnail = normalizeCandidateUrl(element.currentSrc || element.src || (element.getAttribute && element.getAttribute("src")), baseUrl);
+            if (thumbnail && isKnownGoogleThumbnail(thumbnail)) {
+                candidates.push({ url: thumbnail, element, source: "google-thumbnail", isThumbnailFallback: true });
+            }
+        }
         return candidates;
     }
 
@@ -37421,8 +37430,8 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
             start(element) { show(element, "Kopyalanıyor", 12, "progress"); },
             progress(element, fraction) { show(element, "Kopyalanıyor", 12 + Math.max(0, Math.min(1, Number(fraction) || 0)) * 76, "progress"); },
             decoding(element) { show(element, "Panoya hazırlanıyor", 92, "progress"); },
-            complete(element, width, height) {
-                show(element, "Kopyalandı · " + width + "×" + height, 100, "success");
+            complete(element, width, height, isThumbnailFallback) {
+                show(element, (isThumbnailFallback ? "Önizleme kopyalandı · " : "Kopyalandı · ") + width + "×" + height, 100, "success");
                 timer = setTimeout(() => {
                     if (!indicator) return;
                     indicator.root.style.display = "none";
@@ -37627,7 +37636,7 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
                     feedback.decoding(state.element);
                     const prepared = await normalizeImage(downloaded.blob);
                     if (state.cancelled) throw new Error("Görsel hazırlama iptal edildi");
-                    return Object.assign({ source: candidate.source }, prepared);
+                    return Object.assign({ source: candidate.source, isThumbnailFallback: Boolean(candidate.isThumbnailFallback) }, prepared);
                 } catch (error) {
                     state.activeRequest = null;
                     if (state.cancelled) throw error;
@@ -37691,9 +37700,9 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
                     new ClipboardItemCtor({ "image/png": clipboardBlobPromise }),
                 ]));
                 const [prepared] = await Promise.all([preparedPromise, writePromise]);
-                feedback.complete(copyState.element, prepared.width, prepared.height);
-                notify("Kopyalandı: " + prepared.width + "×" + prepared.height, "success");
-                return { status: "copied", width: prepared.width, height: prepared.height, source: prepared.source };
+                feedback.complete(copyState.element, prepared.width, prepared.height, prepared.isThumbnailFallback);
+                notify((prepared.isThumbnailFallback ? "Önizleme kopyalandı: " : "Kopyalandı: ") + prepared.width + "×" + prepared.height, "success");
+                return { status: "copied", width: prepared.width, height: prepared.height, source: prepared.source, isThumbnailFallback: prepared.isThumbnailFallback };
             } catch (error) {
                 cancelState(copyState);
                 const message = error && error.message ? error.message : "Bilinmeyen hata";

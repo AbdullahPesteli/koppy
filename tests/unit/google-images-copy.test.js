@@ -232,7 +232,7 @@ test("Cmd+C copies a QuickHover image on a non-Google site and reports on-image 
     assert.deepEqual(feedback.at(-1), ["complete", 2048, 1365]);
 });
 
-test("current udm=2 docid metadata resolves original URL and never falls back to bare thumbnail src", () => {
+test("current udm=2 docid metadata resolves original URL, then labels thumbnail fallback if metadata disappears", () => {
     const dom = domFrom("google-udm2-current.html", "https://www.google.com/search?q=vmaf&udm=2");
     const image = makeVisible(dom.window.document.getElementById("current-udm2-image"));
     const resolved = Koppy.resolveGoogleImage(image, { baseUrl: dom.window.location.href });
@@ -241,7 +241,10 @@ test("current udm=2 docid metadata resolves original URL and never falls back to
     assert.deepEqual([resolved.width, resolved.height], [1318, 1901]);
 
     dom.window.document.querySelector("script").remove();
-    assert.equal(Koppy.resolveGoogleImage(image, { baseUrl: dom.window.location.href }), null);
+    const fallback = Koppy.resolveGoogleImage(image, { baseUrl: dom.window.location.href });
+    assert.equal(fallback.url, "https://encrypted-tbn0.gstatic.com/images?q=tbn:fixture&s=10");
+    assert.equal(fallback.source, "google-thumbnail");
+    assert.equal(fallback.isThumbnailFallback, true);
 });
 
 test("a negative metadata lookup is retried when Google fills the same script node later", () => {
@@ -249,7 +252,7 @@ test("a negative metadata lookup is retried when Google fills the same script no
         url: "https://www.google.com/search?q=late&udm=2",
     });
     const image = makeVisible(dom.window.document.getElementById("late"));
-    assert.equal(Koppy.resolveGoogleImage(image, { baseUrl: dom.window.location.href }), null);
+    assert.equal(Koppy.resolveGoogleImage(image, { baseUrl: dom.window.location.href }).source, "google-thumbnail");
     dom.window.document.querySelector("script").textContent = `window.__late={"x":[0,"late-doc",["https://encrypted-tbn0.gstatic.com/images?q\\u003dtbn:late",120,80],["https://images.example.test/late-original.jpg",1600,900]]};`;
     assert.equal(Koppy.resolveGoogleImage(image, { baseUrl: dom.window.location.href }).url, "https://images.example.test/late-original.jpg");
 });
@@ -530,23 +533,35 @@ test("copy guards cover textarea, contenteditable, repeat/modifiers, macOS Ctrl+
     assert.equal(prevented, false);
 });
 
-test("a Google thumbnail without an original candidate is blocked instead of becoming a URL copy", async () => {
+test("a Google thumbnail without an original candidate is copied as clearly labelled preview pixels", async () => {
     const dom = new JSDOM(`<!doctype html><img id="thumb" width="120" height="80" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:only-thumb&s=10">`, {
         url: "https://www.google.com/search?q=thumb&udm=2",
     });
     const document = dom.window.document;
     const thumb = makeVisible(document.getElementById("thumb"));
     const notices = [];
-    const controller = Koppy.createController({ document, window: dom.window, location: dom.window.location, notify(message, kind) { notices.push({ message, kind }); } });
+    const requested = [];
+    class ClipboardItemMock { constructor(data) { this.data = data; } }
+    const controller = Koppy.createController({
+        document,
+        window: dom.window,
+        location: dom.window.location,
+        navigator: { clipboard: { async write(items) { await items[0].data["image/png"]; } } },
+        ClipboardItem: ClipboardItemMock,
+        notify(message, kind) { notices.push({ message, kind }); },
+        requestImage(url) { requested.push(url); return { promise: Promise.resolve({ blob: new Blob(["preview"], { type: "image/jpeg" }) }), abort() {} }; },
+        normalizeImage: async blob => ({ blob: new Blob([blob], { type: "image/png" }), width: 447, height: 447 }),
+    });
     controller.setHoveredImage(thumb);
-    let prevented = false;
     const result = await controller.copyHoveredImage({
         key: "c", metaKey: true, target: document.body,
-        preventDefault() { prevented = true; }, stopImmediatePropagation() {},
+        preventDefault() {}, stopImmediatePropagation() {},
     });
-    assert.deepEqual(result, { status: "failed", reason: "candidate-not-found" });
-    assert.equal(prevented, true);
-    assert.match(notices.at(-1).message, /Orijinal görsel adresi bulunamadı/);
+    assert.equal(result.status, "copied");
+    assert.equal(result.source, "google-thumbnail");
+    assert.equal(result.isThumbnailFallback, true);
+    assert.deepEqual(requested, [thumb.src]);
+    assert.match(notices.at(-1).message, /Önizleme kopyalandı: 447×447/);
 });
 
 test("controller clears its hover candidate on SPA route changes", () => {
@@ -644,24 +659,28 @@ test("clipboard permission rejection aborts the active download immediately", as
     assert.equal(aborted, true);
 });
 
-test("a real Google result without an original candidate reports an error", async () => {
+test("a real Google result with only a thumbnail offers labelled preview fallback", async () => {
     const dom = domFrom("google-udm2-current.html", "https://www.google.com/search?q=vmaf&udm=2");
     dom.window.document.querySelector("script").remove();
     const image = makeVisible(dom.window.document.getElementById("current-udm2-image"));
     const notices = [];
+    class ClipboardItemMock { constructor(data) { this.data = data; } }
     const controller = Koppy.createController({
         document: dom.window.document,
         window: dom.window,
         location: dom.window.location,
+        navigator: { clipboard: { async write(items) { await items[0].data["image/png"]; } } },
+        ClipboardItem: ClipboardItemMock,
         notify: (message, kind) => notices.push({ message, kind }),
+        requestImage: () => ({ promise: Promise.resolve({ blob: new Blob(["preview"], { type: "image/jpeg" }) }), abort() {} }),
+        normalizeImage: async blob => ({ blob: new Blob([blob], { type: "image/png" }), width: 160, height: 100 }),
     });
     controller.setHoveredImage(image);
-    let prevented = false;
     const result = await controller.copyHoveredImage({
         key: "c", metaKey: true, target: dom.window.document.body,
-        preventDefault() { prevented = true; }, stopImmediatePropagation() {},
+        preventDefault() {}, stopImmediatePropagation() {},
     });
-    assert.deepEqual(result, { status: "failed", reason: "candidate-not-found" });
-    assert.equal(prevented, true);
-    assert.match(notices[0].message, /Orijinal görsel adresi bulunamadı/);
+    assert.equal(result.status, "copied");
+    assert.equal(result.isThumbnailFallback, true);
+    assert.match(notices.at(-1).message, /Önizleme kopyalandı: 160×100/);
 });

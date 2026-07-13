@@ -1,6 +1,6 @@
 # Koppy — Durum
 
-**Sürüm:** 0.3.1
+**Sürüm:** 0.3.2
 **Lisans:** MIT
 **Dağıtım:** `dist/Koppy.user.js` üzerinden Tampermonkey
 
@@ -46,4 +46,5 @@
 - 0.2.9: Canlı Kontrol üst sağda açılacak şekilde düzenlendi; panel sürüklenebilir ve sabitlenebilir oldu. Sabit değilken sayfaya tıklama paneli kapatır, sabitken hover/deneme sırasında açık kalır.
 - 0.3.0: Google aday çözümleme, Picviewer'ın eşit `src/imgSrc` sonuçlarını, lazy-load alanlarını, `picture`/`srcset` kaynaklarını ve yüklenmiş büyük preview'i kapsayacak şekilde genişletildi. Küçük Google thumbnail'ı fallback olarak hâlâ engellidir.
 - 0.3.1: Açık kaynak taramasıyla MaxURL (Apache-2.0), Image Downloader (lisans yok), KellyC (GPL-3.0) ve Imagus Reborn (lisans yok) değerlendirildi. Koppy'ye bağımsız CSS `background-image`, video `poster` ve SVG `<image>` adayları eklendi; 39 unit + 8 browser E2E test geçti. Ayrıntılı araştırma notu yerel `docs/private/` altında tutulur.
+- 0.3.2: Google yalnız encrypted thumbnail veriyorsa hata yerine gerçek thumbnail piksellerini kopyalar; başarı bildirimi bunu açıkça **Önizleme kopyalandı** diye belirtir. Orijinal aday her zaman önce denenir.
 - Tampermonkey kurulum sayfası Zen'de arka planda açıldı. İlk kurulumdan sonra **Automatic installation** açık olmalıdır.

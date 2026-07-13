@@ -43,7 +43,8 @@ yüklenmiş büyük preview kaynağını dener. Koppy yalnız `https:`
 görselleri kabul eder; localhost/private ağ hedeflerini, yönlendirmeleri, raster olmayan yanıtları, 80 MB
 üzerindeki indirmeleri ve güvenli piksel/dimension sınırını aşan görselleri reddeder. İstekler anonim ve
 20 saniye timeout ile yapılır. Google Görseller'de gstatic thumbnail'ı hiçbir zaman “orijinal” diye
-kopyalanmaz; gerçek aday yoksa açık hata gösterilir. PNG, JPEG ve WebP desteklenir; GIF/AVIF kaynakları
+sunulmaz; gerçek aday yoksa son çare olarak thumbnail'ın gerçek pikselleri **Önizleme kopyalandı** bildirimiyle
+kopyalanır. PNG, JPEG ve WebP desteklenir; GIF/AVIF kaynakları
 “desteklenmeyen tür” hatasıyla reddedilir.
 
 Tampermonkey menüsündeki **Koppy Canlı Kontrol**, en sık üç kararı küçük bir panelden verir: önizleme tuşu,
