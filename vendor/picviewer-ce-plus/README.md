@@ -1,0 +1,317 @@
+# 🏞️ Picviewer CE+
+
+[![twitter](https://img.shields.io/twitter/follow/HoothinDev)](https://twitter.com/intent/follow?screen_name=HoothinDev) [![Discord](https://img.shields.io/badge/Discord-Join-blue.svg?logo=discord&style=social)](https://discord.com/invite/keqypXC6wD) [![reddit](https://img.shields.io/reddit/subreddit-subscribers/PicviewerCE)](https://www.reddit.com/r/PicviewerCE) [![stars](https://img.shields.io/github/stars/Hoothin/UserScripts)](https://github.com/hoothin/UserScripts#StarMe)
+
+### Zoom images across all your favorite websites. Pop up, scale, edit, rotate, batch save images, or automatically load pictures from subsequent pages. Simply hover your mouse over any image and click the icons on the float bar.
+
++ **Adjust:** Scale/rotate/batch save every picture
+
++ **View:** Find and popup large version for pictures with click or mouse over
+
++ **Fetch:** Auto load and parse next paginated web
+ pages and show ALL pics
+
++ **Download:** Pictures export to page or package into ZIP
+
++ **Search:** Search similar image by picture
+
++ View long image by scroll
+
+Recommended similar plugins: [Imagus](https://chromewebstore.google.com/detail/imagus/immpkjjlgappgfkkfieppnmlhakdmaab) - [Hover-zoom+](https://chromewebstore.google.com/detail/hover-zoom+/pccckmaobkjjboncdfnnofkonhgpceea) - [Mouseover Popup Image Viewer](https://greasyfork.org/scripts/394820)
+
+## Quick Start
+
+Install from [Github📥](https://hoothin.github.io/UserScripts/Picviewer%20CE+/dist.user.js) or [Greasefork📥](https://greasyfork.org/scripts/24204-picviewer-ce).
+
+Hover your mouse over any image and click the icons on the float bar.
+
+Press `CTRL + G` to quickly enter the gallery. Hold `CTRL` to view a larger picture when hovering over images or links.
+
+There are additional settings available in the "Picviewer CE+ config" for further customization. Currently, reviewing these settings is the best way to learn about the script's capabilities. Try exploring more functions on your own!
+
+## Contribution & Support
+
+If you are glad to assist with the translation, please ✍️[edit this file](https://github.com/hoothin/UserScripts/edit/master/Picviewer%20CE%2B/pvcep_lang.js#L1). It will be beneficial for individuals who speak the same language as you do. Thank you for your help.
+
++ English by [RX-3200](https://greasyfork.org/users/43-rx-3200).
+
++ Português by [AstroCoelestis](https://greasyfork.org/users/881248).
+
++ Русский by RX-3200 & vanja-san.
+
++ Turkish by [PUFF1N](https://github.com/PUFF1N-000).
+
++ Ukrainian by [MaSHiNiK](https://github.com/MaSHiNiK).
+
++ Arabic by [Prankster 199](https://github.com/vfggf95565).
+
+*Need more rules for peculiar sites? feel free to pull requests or open issues.*
+
+## PDF Addon
+Picviewer CE+ [PDF Addon](https://hoothin.github.io/UserScripts/Picviewer%20CE+/pvcep_pdf_addon.user.js). After installing this addon, when the `Compress to ZIP` feature is enabled, a PDF file will be generated instead of a ZIP file during the packaging process.
+
+<details>
+<summary>Make a PDF e-book with this addon</summary>
+<p dir="auto">For example, if there is a website with images from <code>xxx.com/1.jpg</code> to <code>xxx.com/99.jpg</code>, you can use this addon to generate a beautiful PDF e-book as follows:</p>
+<ol dir="auto">
+<li>Open the gallery by pressing Ctrl + g</li>
+<li>In the <code>Command</code> menu, find and click <code>Add image</code></li>
+<li>Input <code>xxx.com/[1-99].jpg</code></li>
+<li>Right-click in the thumbnail frame below to ignore any unwanted images</li>
+<li>Click <code>Download all shown</code> in the <code>Command</code> menu</li>
+</ol>
+<p dir="auto">This way, you'll get a beautifully created PDF e-book.</p>
+ </details>
+
+## Custom [Rules Example](pvcep_rules.js):
+**💝 Buy me a coffee with [Ko-fi](https://ko-fi.com/hoothin) or [愛發電](https://afdian.com/a/hoothin) to keep my scripts always up to date.**
+
+<a href="https://github.com/hoothin/UserScripts/raw/master/Picviewer%20CE%2B/customRule.png"><img src="customRule.png" height="100"></a>
+
++ Match image src(no matter which site) with /pics\\.dmm\\.co\\.jp/i and replace image url from "ps.jpg" to "pl.jpg"
+
+``` json
+{
+    "name": "Dmm",
+    "src": "pics\\.dmm\\.co\\.jp",
+    "r": "ps.jpg",
+    "s": "pl.jpg"
+}
+```
++ Match site with /xxx\.com/ and replace image url from /us\\.xxx\\.com/\d+wm\//i to "previews.xxx.com/images/"
+
+``` json
+{
+   "name": "Example",
+   "url": "^https://xxx\\.com/",
+   "r": "/us\\.xxx\\.com/\\d+wm//i",
+   "s": "previews.xxx.com/images/"
+}
+```
++ Add click-to-open for existing asiansister rule.
+
+``` json
+{
+    "name": "Asiansister",
+    "clickToOpen": {
+        "enabled": true,
+        "preventDefault": true,
+        "type": "actual",
+        "button": 0,
+        "alt": false,
+        "ctrl": false,
+        "shift": false,
+        "meta": false
+    }
+}
+```
+You have the option to use a standalone userscript, which allows you to manage all of your custom rules effectively.
+
+Feel free to share your own custom rules on Greasy Fork!
+
+``` js
+// ==UserScript==
+// @name         Picviewer CE+ custom rules
+// @namespace    hoothin
+// @version      0.1
+// @description  Picviewer CE+ custom rules
+// @author       You
+// @match        *://*/*
+// @run-at       document-start
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+    window.pvcepRules = (window.pvcepRules || []).concat([
+         //Delete these two example rules and add your own.
+         {
+             name: "rule1",
+             src: /pics\.dmm\.co\.jp/i,
+             r: "ps.jpg",
+             s: "pl.jpg"
+         },
+         {
+             name: "rule2",
+             url: /^https:\/\/xxx\.com\//,
+             r: /us\.xxx\.com\/\d+wm\//i,
+             s: "previews.xxx.com/images/"
+         }
+    ]);
+})();
+```
+
+
+<details>
+<summary>Advance rule wizard</summary>
+<p dir="auto">There are two types of rules available:</p>
+<ul dir="auto">
+<li>
+<p dir="auto">JSON (simple mode)</p>
+<p dir="auto">These rules are written in JSON format and can be imported online through <a href="https://github.com/hoothin/UserScripts/discussions">Discussions</a> or <a href="https://www.reddit.com/r/PicviewerCE" rel="nofollow">Reddit</a>.
+They won't limited by websites that have a strict Content Security Policy that disallows unsafe-eval.</p>
+<ul dir="auto">
+<li>JSON params
+<ul dir="auto">
+<li>
+<p dir="auto">name</p>
+<p dir="auto"><code>"name": "rule name"</code></p>
+<p dir="auto">Name of the rule</p>
+</li>
+<li>
+<p dir="auto">url</p>
+<p dir="auto"><code>"url": "^https://google\\.com"</code></p>
+<p dir="auto">Regular expression used to match the site URL.</p>
+</li>
+<li>
+<p dir="auto">src</p>
+<p dir="auto"><code>"src": "^https://image\\.xx\\.com"</code></p>
+<p dir="auto">Regular expression used to match the image src</p>
+</li>
+<li>
+<p dir="auto">r</p>
+<p dir="auto"><code>"r": "/(.*)\\d+/i"</code> or <code>"r": "thumb"</code></p>
+<p dir="auto">Simple string or regular expression used to replace the image src from</p>
+</li>
+<li>
+<p dir="auto">s</p>
+<p dir="auto"><code>"s": "$1"</code></p>
+<p dir="auto">Replace the image src to</p>
+</li>
+<li>
+<p dir="auto">ext</p>
+<p dir="auto"><code>"ext": "previous"</code></p>
+<p dir="auto">Capture nearby image element when the mouse hovers over a non-image element.</p>
+</li>
+<li>
+<p dir="auto">lazyAttr</p>
+<p dir="auto"><code>"lazyAttr": "data-lazy"</code></p>
+<p dir="auto">Lazy loaded original image URL attribute name</p>
+</li>
+<li>
+<p dir="auto">xhr</p>
+<p dir="auto"><code>"xhr": { "url": ".showcase__link", "query": "img[fetchpriority]" }</code></p>
+<p dir="auto">Fetch the link above the image that matches ".showcase__link" and query the "img[fetchpriority]" on the inner page from the link.</p>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p dir="auto">JS (full mode)</p>
+<p dir="auto">These rules are written in JavaScript object format. If you are not using a standalone userscript, they may be limited by websites that have a strict Content Security Policy that disallows unsafe-eval.</p>
+<ul dir="auto">
+<li>JS params
+<ul dir="auto">
+<li>all mentioned above and the function type instead of string type</li>
+<li>getImage</li>
+<li>getExtSrc</li>
+</ul>
+</li>
+</ul>
+<p dir="auto">Learn from <a href="https://github.com/hoothin/UserScripts/blob/master/Picviewer%20CE%2B/pvcep_rules.js">https://github.com/hoothin/UserScripts/blob/master/Picviewer%20CE%2B/pvcep_rules.js</a></p>
+</li>
+</ul>
+ </details>
+
+## Blank Gallery Page
+[https://hoothin.github.io/UserScripts/Picviewer%20CE+/gallery.html](https://hoothin.github.io/UserScripts/Picviewer%20CE+/gallery.html)
+
+> *A blank gallery page designed for viewing local or online pictures, showcasing every image you have imported.*
+
+You can drag and drop **folders** or videos/audios/images into this gallery to get an electronic slideshow to view them.
+
+Click with `Ctrl key` can import folder too.
+
+Include `mode=`*`1`* to open gallery in view-more mode.<br/>
+Add `imgs=`*`http://xxx/xxx.jpg`* to import images. ` ` to split multi-image, `[01-09]` to generate nine urls form 01 to 09<br/>
+For example: 
+```url
+https://hoothin.github.io/UserScripts/Picviewer%20CE+/gallery.html?mode=0&imgs=http://xxx/xxx[01-99].jpg
+or
+https://hoothin.github.io/UserScripts/Picviewer%20CE+/gallery.html?mode=0&imgs=${encodeURIComponent(IMG1 + ' ' + IMG2)}
+```
+
+<img src='https://v2fy.com/asset/063_picviewer_ce/72723103-d911ce00-3bba-11ea-9541-0be746977dbc.gif' width=325><img src='https://v2fy.com/asset/063_picviewer_ce/72767872-7eb35480-3c30-11ea-814d-ce4678c81089.gif' width=325><img src='https://v2fy.com/asset/063_picviewer_ce/73130353-c4598e00-4031-11ea-810e-9498677a40d1.gif' width=325>
+
+## Thousands compatible sites for find larger or original images like
+
+deviantart.com
+google.com
+wikipedia.org
+dribbble.com
+bing.com
+imdb.com
+github.com
+tumblr.com
+youtube.com
+pixiv.net
+steampowered.com
+itunes.apple.com
+pinterest.com
+gelbooru.com
+discordapp.com
+twitter.com
+fandom.com
+reddit.com
+yande.re
+wallhaven.cc
+500px
+nyaa
+e621.net
+nhentai.net
+tieba.baidu.com
+douban.com
+weibo.com
+bilibili.com
+t.qq.com
+huaban.com
+hujiang.com
+dianping.com
+trakt.tv
+music.163.com
+rule34hentai.net
+photosight.ru
+boqingguan.com
+178.com
+zhisheji.com
+themex.net
+operachina.com
+topit.me
+bcy.net
+zhihu.com
+autohome.com.cn
+bitauto.com
+xcar.com.cn
+pcauto.com.cn
+auto.sina.com.cn
+baike.baidu.com
+nvshens.com
+24meitu.com
+acgget.com
+lofter.com
+sohu.com
+taobao.com
+alibaba.com
+yihaodian.com
+addons.mozilla.org
+crsky.com
+firefox.net.cn
+jd.com
+dangdang.com
+detail.zol.com.cn
+duokan.com
+youku.com
+yyets.com
+xiaohongshu.com
+moegirl.org
+fanfou.com
+meipai.com
+game.yesky.com
+dota2.sgamer.com
+mafengwo.cn
+588ku.com
+ibaotu.com
+58pic.com
+
+And so on ...

@@ -1,0 +1,20 @@
+# Dependencies and generated local reports
+node_modules/
+test-results/
+playwright-report/
+coverage/
+*.log
+
+# Local workspace, private research and editor/OS state
+.context/
+docs/private/
+.DS_Store
+.idea/
+.vscode/
+
+# Credentials and machine-local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key

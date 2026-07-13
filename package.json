@@ -1,0 +1,25 @@
+{
+  "name": "koppy",
+  "version": "0.2.4",
+  "description": "Koppy: Google Images direct-image clipboard fork of Picviewer CE+ for Tampermonkey",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AbdullahPesteli/koppy.git"
+  },
+  "bugs": {
+    "url": "https://github.com/AbdullahPesteli/koppy/issues"
+  },
+  "homepage": "https://github.com/AbdullahPesteli/koppy#readme",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "clipboard:inspect": "swift scripts/clipboard-inspect.swift",
+    "test": "node --test tests/unit/*.test.js",
+    "test:e2e": "playwright test",
+    "check": "npm run build && npm test && npm run test:e2e"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "jsdom": "26.1.0"
+  }
+}
