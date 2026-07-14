@@ -55,7 +55,7 @@ test("live control deck applies a single modifier, repositions an active bar and
     const panel = host.locator(".panel");
     await expect(panel).toBeVisible();
     await expect(panel).toContainText("Canlı Kontrol");
-    await expect(host.locator(".stack-toggle")).toHaveText("Stack");
+    await expect(host.locator(".stack-toggle")).toHaveText("Topla");
     await expect(panel).toContainText("Koppy’yi güncelle");
     await expect(panel).toContainText("Tüm ayarları aç");
     await host.locator('button[aria-label="Command ile önizleme"]').click();

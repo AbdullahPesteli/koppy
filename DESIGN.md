@@ -45,6 +45,10 @@ Koppy, görsel işi sırasında arka planda güvenilir kalan kişisel bir araçt
   %72'sine sığar; kullanıcı ölçü girerse bu sınır aynen uygulanır.
 - `⌘C` sırasında görselin alt kenarında ince, sakin bir ilerleme çizgisi görünür; başarıda kısa süre
   `Kopyalandı · genişlik×yükseklik` metnine dönüşür. Sayfa altındaki toast hata ve erişilebilirlik yedeğidir.
+- Görsel Stack açıksa aynı başarı geri bildiriminin sağında kısa bir `+1 Stack · N görsel` çipi yukarı
+  oturarak görünür; bu, normal panoya kopyalamanın yanında geçici listeye de eklendiğini açıkça ayırır.
+  Canlı Kontrol başlığındaki **Topla** düğmesi açıkken noktalı `Stack N` durumuna döner; N sıfırdan büyükse
+  yanındaki mini `×` yalnız Stack belleğini temizler. Hareketler reduced-motion tercihinde kapalıdır.
 - Tampermonkey menüsünden açılan **Canlı Kontrol**, tam ayar penceresinin yerine geçen ikinci bir form değildir:
   yalnız önizleme tuşu, FloatBar konumu ve preview boyutu için küçük, sayfaya ilişen bir kontrol yüzeyidir.
   Seçim gerçek `prefs` değerine kullanıcı tıklamasıyla anında yazılır; açık FloatBar/preview varsa değişiklik

@@ -178,6 +178,8 @@ test("Stack mode keeps the regular clipboard as one current PNG while retaining 
             width: bitmap.width,
             height: bitmap.height,
             stack: window.__stackController.getStackState(),
+            feedback: document.querySelector("#koppy-copy-feedback").textContent,
+            stackChip: document.querySelector(".koppy-copy-feedback-stack").textContent,
         };
         bitmap.close();
         return value;
@@ -190,6 +192,10 @@ test("Stack mode keeps the regular clipboard as one current PNG while retaining 
     expect(result.clipboardTypes).toEqual(["image/png"]);
     expect([result.width, result.height]).toEqual([320, 180]);
     expect(result.stack.count).toBe(2);
+    expect(result.feedback).toContain("Kopyalandı · 320×180");
+    expect(result.stackChip).toBe("+1 Stack · 2 görsel");
+    fs.mkdirSync(path.resolve("test-results"), { recursive: true });
+    await page.screenshot({ path: "test-results/koppy-stack-feedback.png" });
 
     const cleared = await page.evaluate(() => window.__stackController.clearStack());
     expect(cleared).toMatchObject({ enabled: true, count: 0, bytes: 0 });

@@ -947,7 +947,17 @@
                 background: "rgba(11, 14, 19, .86)", font: "600 11px/1.2 -apple-system, BlinkMacSystemFont, sans-serif",
                 letterSpacing: ".01em", boxShadow: "0 3px 12px rgba(0,0,0,.22)",
             });
-            root.append(fill, label);
+            const stackChip = doc.createElement("span");
+            stackChip.className = "koppy-copy-feedback-stack";
+            stackChip.setAttribute("aria-hidden", "true");
+            Object.assign(stackChip.style, {
+                position: "absolute", right: "0", bottom: "8px", display: "none", whiteSpace: "nowrap",
+                padding: "4px 7px", borderRadius: "6px", color: "#dbe5ff", background: "rgba(38, 53, 87, .94)",
+                border: "1px solid rgba(124,156,255,.55)", font: "700 11px/1.2 -apple-system, BlinkMacSystemFont, sans-serif",
+                letterSpacing: ".01em", boxShadow: "0 3px 12px rgba(0,0,0,.22)", opacity: "0", transform: "translateY(4px)",
+                transition: "opacity 180ms ease, transform 180ms ease",
+            });
+            root.append(fill, label, stackChip);
             doc.documentElement.appendChild(root);
             const sourceOutline = doc.createElement("div");
             sourceOutline.className = "koppy-copy-source-outline";
@@ -957,7 +967,7 @@
                 boxShadow: "0 0 0 2px rgba(124,156,255,.17)", transition: "border-color 160ms ease, box-shadow 160ms ease",
             });
             doc.documentElement.appendChild(sourceOutline);
-            indicator = { root, fill, label, sourceOutline, element: null, source: null };
+            indicator = { root, fill, label, stackChip, sourceOutline, element: null, source: null };
             return indicator;
         }
 
@@ -1001,6 +1011,9 @@
             if (!item) return;
             clearTimeout(timer);
             item.label.textContent = label;
+            item.stackChip.style.display = "none";
+            item.stackChip.style.opacity = "0";
+            item.stackChip.style.transform = "translateY(4px)";
             item.root.style.display = "block";
             item.fill.style.background = kind === "error" ? "#ff7185" : kind === "success" ? "#62cf91" : "#7c9cff";
             item.fill.style.width = Math.max(0, Math.min(100, Number(percent) || 0)) + "%";
@@ -1010,11 +1023,31 @@
             start(element) { show(element, "Kopyalanıyor", 12, "progress"); },
             progress(element, fraction) { show(element, "Kopyalanıyor", 12 + Math.max(0, Math.min(1, Number(fraction) || 0)) * 76, "progress"); },
             decoding(element) { show(element, "Panoya hazırlanıyor", 92, "progress"); },
-            complete(element, width, height, isThumbnailFallback) {
-                show(element, (isThumbnailFallback ? "Önizleme kopyalandı · " : "Kopyalandı · ") + width + "×" + height, 100, "success");
+            complete(element, width, height, isThumbnailFallback, stackResult) {
+                const stackCount = stackResult && stackResult.added && stackResult.state && Number(stackResult.state.count);
+                const copiedLabel = (isThumbnailFallback ? "Önizleme kopyalandı · " : "Kopyalandı · ") + width + "×" + height;
+                show(element, copiedLabel, 100, "success");
+                if (stackCount && indicator) {
+                    indicator.stackChip.textContent = "+1 Stack · " + stackCount + " görsel";
+                    indicator.stackChip.style.display = "block";
+                    const reducedMotion = win && typeof win.matchMedia === "function" && win.matchMedia("(prefers-reduced-motion: reduce)").matches;
+                    if (reducedMotion) {
+                        indicator.stackChip.style.opacity = "1";
+                        indicator.stackChip.style.transform = "none";
+                    } else {
+                        const reveal = () => {
+                            if (!indicator) return;
+                            indicator.stackChip.style.opacity = "1";
+                            indicator.stackChip.style.transform = "translateY(0)";
+                        };
+                        if (win && typeof win.requestAnimationFrame === "function") win.requestAnimationFrame(reveal);
+                        else setTimeout(reveal, 0);
+                    }
+                }
                 timer = setTimeout(() => {
                     if (!indicator) return;
                     indicator.root.style.display = "none";
+                    indicator.stackChip.style.display = "none";
                     indicator.sourceOutline.style.display = "none";
                 }, 1500);
             },
@@ -1023,6 +1056,7 @@
                 timer = setTimeout(() => {
                     if (!indicator) return;
                     indicator.root.style.display = "none";
+                    indicator.stackChip.style.display = "none";
                     indicator.sourceOutline.style.display = "none";
                 }, 2400);
             },
@@ -1476,10 +1510,10 @@
                     new ClipboardItemCtor({ "image/png": clipboardBlobPromise }),
                 ]));
                 const [prepared] = await Promise.all([preparedPromise, writePromise]);
-                feedback.complete(copyState.element, prepared.width, prepared.height, prepared.isThumbnailFallback);
                 const stacked = addToStack(prepared);
+                feedback.complete(copyState.element, prepared.width, prepared.height, prepared.isThumbnailFallback, stacked);
                 let message = (prepared.isThumbnailFallback ? "Önizleme kopyalandı: " : "Kopyalandı: ") + prepared.width + "×" + prepared.height;
-                if (stacked.added) message += " · Stack " + stacked.state.count;
+                if (stacked.added) message += " · Stack’e eklendi (" + stacked.state.count + ")";
                 else if (stack.enabled && stacked.reason === "item-limit") message += " · Stack dolu (" + MAX_STACK_ITEMS + ")";
                 else if (stack.enabled && stacked.reason === "byte-limit") message += " · Stack bellek sınırında";
                 notify(message, stacked.reason ? "progress" : "success");

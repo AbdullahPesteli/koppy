@@ -100,7 +100,7 @@ test("live control deck toggles and clears the opt-in Stack without using prefer
     deck.show();
     const root = dom.window.document.querySelector("koppy-control-deck").shadowRoot;
     const toggle = root.querySelector(".stack-toggle");
-    assert.equal(toggle.textContent, "Stack");
+    assert.equal(toggle.textContent, "Topla");
     toggle.click();
     assert.equal(stack.enabled, true);
     assert.equal(root.querySelector(".stack-toggle").textContent, "Stack 0");

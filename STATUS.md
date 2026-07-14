@@ -1,6 +1,6 @@
 # Koppy — Durum
 
-**Sürüm:** 0.4.6
+**Sürüm:** 0.4.7
 **Lisans:** MIT
 **Dağıtım:** `dist/Koppy.user.js` üzerinden Tampermonkey
 
@@ -11,7 +11,7 @@
 - Kopyalama, mümkünse QuickHover'ın süzülen preview panelinde ince ilerleme çizgisi ve çözünürlüklü başarı bilgisi verir; küçük kaynak görsel yalnız ince hedef çerçevesi taşır. Metin kopyalamayı bozmaz.
 - QuickHover önizlemesi boş boyut ayarında ekranı kaplamak yerine yaklaşık ekranın %72'sine sığar; elle girilen sınır korunur.
 - Tampermonkey menüsündeki **Koppy Canlı Kontrol**, sık kullanılan modifier, FloatBar konumu ve preview boyutunu küçük bir panelden gerçek davranışa anında uygular. Panel üst sağda açılır, başlığından sürüklenebilir; **sabitle** açıkken sayfada deneme yaparken kapanmaz. Aynı paneldeki **Koppy’yi güncelle** eylemi Tampermonkey güncelleme sayfasını doğrudan açar.
-- Canlı Kontrol’deki varsayılan-kapalı **Görsel Stack**, normal `Cmd+C` sonucunu değiştirmez: her basış macOS panosuna yalnız son PNG’yi yazar. Stack açıksa aynı başarılı PNG, sayfa belleğindeki geçici listeye de eklenir; en fazla 10 görsel / 150 MB tutulur. `× Temizle` yalnız bu listeyi bırakır, sistem panosuna dokunmaz. Stack, çoklu görüntüyü web panosuna yazma vaadi değildir; sonraki dosya dışa-aktarma akışı için hazırlık katmanıdır.
+- Canlı Kontrol’deki varsayılan-kapalı **Görsel Stack**, normal `Cmd+C` sonucunu değiştirmez: her basış macOS panosuna yalnız son PNG’yi yazar. Stack açıksa aynı başarılı PNG, sayfa belleğindeki geçici listeye de eklenir; en fazla 10 görsel / 150 MB tutulur. Kopya anında görsel üstünde `+1 Stack · N görsel` çipi görünür; başlıktaki noktalı `Stack N` sayacı ve mini `×` bunun kalıcı durumunu taşır. `×` yalnız bu listeyi bırakır, sistem panosuna dokunmaz. Stack, çoklu görüntüyü web panosuna yazma vaadi değildir; sonraki dosya dışa-aktarma akışı için hazırlık katmanıdır.
 - Ayar arayüzü sandbox'lıdır; 91 mevcut Picviewer ayarının saklama sözleşmesini korur.
 - `@updateURL` / `@downloadURL` GitHub'daki sürüm dosyasına bağlıdır. Tampermonkey'de **Automatic installation** açık olmalıdır.
 
@@ -57,4 +57,5 @@
 - 0.4.4: Güvenli HTTPS yönlendirmeleri artık tek tek doğrulanarak takip edilir. OpenUSD/Pixar görseli gibi CDN taşınmaları kopyalanır; HTTP, özel ağ/localhost hedefi, eksik `Location` ve beşten fazla yönlendirme yine reddedilir.
 - 0.4.5: Sadece yazı olarak sunulan SVG/raster indirme linkleri ve uzantısız ama `download` işaretli imzalı CDN linkleri de kopya adayıdır; dosya içeriği hâlâ indirildikten sonra imza/MIME doğrulamasından geçer.
 - 0.4.6: Varsayılan kapalı Görsel Stack eklendi. Normal `Cmd+C` her seferinde tek güncel PNG clipboard öğesi olarak korundu; Stack açıkken aynı PNG geçici belleğe de ekleniyor. Canlı Kontrol’den aç/kapat, sayaç ve yalnız Koppy belleğini temizleyen `× Temizle` sunuluyor. 10 öğe / 150 MB üst sınırı sessiz bellek birikimini engelliyor. Unit + browser E2E, iki Stack kopyasında sistem panosunun tek PNG kaldığını ve Stack temizliğinin panoyu değiştirmediğini doğruluyor.
+- 0.4.7: Stack’in görünür geri bildirimi güçlendirildi. Kopya çizgisi yanında animasyonlu `+1 Stack · N görsel` çipi, toast’ta açık “Stack’e eklendi” metni ve Canlı Kontrol başlığında noktalı aktif sayaç var. Stack, teknik olarak açık olsa da görünmez kalan bir mod olmaktan çıktı; browser E2E bu görünür sayacı doğruluyor.
 - Tampermonkey kurulum sayfası Zen'de arka planda açıldı. İlk kurulumdan sonra **Automatic installation** açık olmalıdır.

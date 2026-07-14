@@ -43,6 +43,8 @@ açılır. Bu mod normal `Cmd+C` davranışını değiştirmez: macOS panosunda 
 Koppy aynı başarılı PNG’yi geçici Stack’e de ekler. Sayaç en fazla 10 görsel veya 150 MB tutar. `× Temizle`
 yalnız Koppy’nin belleğini serbest bırakır, mevcut sistem clipboard içeriğini silmez. Stack, tarayıcının
 desteklemediği çok-öğeli clipboard yerine ilerideki ayrı-dosya dışa-aktarma akışı için hazırlık alanıdır.
+Stack açık bir kopyada, görselin üzerindeki normal başarı çizgisinin yanında kısa `+1 Stack · N görsel`
+geri bildirimi ve toast içinde `Stack’e eklendi (N)` görünür; böylece aynı görselin listeye alındığı açıkça anlaşılır.
 
 Hover yalnız URL adayını çözer; ağ/decode işlemi `Cmd+C` öncesinde başlamaz. Google'da Koppy, Picviewer'ın
 çözdüğü kaynakla birlikte bağlantı parametreleri, güncel metadata, lazy-load alanları, `picture`/`srcset` ve
