@@ -89,3 +89,25 @@ test("Koppy Bridge records redacted transport facts and performs one bounded rec
     assert.match(trace, /bridge_recovery_ok/);
     assert.doesNotMatch(trace, /private\.example|secret|Bearer|token/);
 });
+
+test("Koppy Bridge forwards only a redacted terminal diagnostic snapshot to the local helper", async t => {
+    const previous = global.GM;
+    t.after(() => {
+        if (previous === undefined) delete global.GM;
+        else global.GM = previous;
+    });
+    let report;
+    global.GM = {
+        xmlHttpRequest(options) {
+            if (/\/token$/.test(options.url)) return Promise.resolve({ status: 200, responseText: JSON.stringify({ ok: true, token: "d".repeat(43) }) });
+            report = JSON.parse(options.data);
+            return Promise.resolve({ status: 200, responseText: JSON.stringify({ ok: true, accepted: 1 }) });
+        },
+    };
+    const bridge = KoppyBridge.create({ Blob });
+    await bridge.reportDiagnostics({ recent: [{
+        event: "copy_failed", errorKind: "decode", status: 415,
+        url: "https://private.example/never-send", token: "never-send", responseText: "never-send",
+    }] });
+    assert.deepEqual(report, { schema: 1, recent: [{ event: "copy_failed", errorKind: "decode", status: 415 }] });
+});

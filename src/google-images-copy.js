@@ -880,12 +880,11 @@
         const rect = typeof image.getBoundingClientRect === "function" ? image.getBoundingClientRect() : null;
         const width = Number(image.clientWidth || image.width || (rect && rect.width) || 0);
         const height = Number(image.clientHeight || image.height || (rect && rect.height) || 0);
-        // A normal image needs a meaningful footprint so we do not hijack a tiny
-        // decorative asset. Downloadable PDF/AI links are intentionally text-sized,
-        // though: Turkcell's logo cards, for example, render their PDF and AI choices
-        // as 20px-high anchors. Those are explicit copy targets, not incidental UI.
+        // Keep ordinary UI chrome out, but a real visible image can be small
+        // (logos, diagrams and inline SVG assets often are). Downloadable PDF/AI
+        // links are intentionally text-sized too.
         if (isDocumentSurface(image)) return width >= 12 && height >= 12;
-        return width >= 60 && height >= 60;
+        return width >= 18 && height >= 18;
     }
 
     function isGoogleResultImage(image) {
@@ -952,20 +951,13 @@
 
         function preferredTarget(source) {
             if (!doc || !source) return source;
-            // QuickHover has one transient `.preview` window. Its imgbox is the visual
-            // the user is looking at, so status belongs there—not on the small result
-            // that originally triggered the hover. Never use ordinary opened windows.
+            // Only a preview which literally contains the source can claim the
+            // feedback. A global “latest preview” can belong to an earlier hover
+            // and caused the bar/outline to jump across unrelated page graphics.
             const ownPreview = source.closest && source.closest(".pv-pic-window-container.preview");
             if (ownPreview) {
                 const ownBox = ownPreview.querySelector(".pv-pic-window-imgbox");
                 if (visibleRect(ownBox)) return ownBox;
-            }
-            if (!doc.querySelectorAll) return source;
-            const previews = Array.from(doc.querySelectorAll(".pv-pic-window-container.preview"));
-            for (let index = previews.length - 1; index >= 0; index -= 1) {
-                const preview = previews[index];
-                const box = preview.querySelector && preview.querySelector(".pv-pic-window-imgbox");
-                if (visibleRect(box)) return box;
             }
             return source;
         }
@@ -1427,6 +1419,13 @@
             if (!blob || bytes > MAX_STACK_BYTES) {
                 return { added: false, reason: "byte-limit", state: stackState() };
             }
+            // Normal Cmd+C still refreshes the macOS clipboard every time. Recent
+            // Copies is a later, opt-in batch decision, so retrying the same source
+            // must not silently inflate it with duplicate cards.
+            const fingerprint = String(prepared && prepared.candidateUrl || "") + "|" + Number(prepared && prepared.width || 0) + "x" + Number(prepared && prepared.height || 0);
+            if (fingerprint && stack.items.some(item => item.fingerprint === fingerprint)) {
+                return { added: false, reason: "duplicate", state: stackState() };
+            }
             let evicted = 0;
             while (stack.items.length && (stack.items.length >= MAX_STACK_ITEMS || stack.bytes + bytes > MAX_STACK_BYTES)) {
                 const oldest = stack.items.shift();
@@ -1439,6 +1438,7 @@
                 width: prepared.width,
                 height: prepared.height,
                 source: prepared.source,
+                fingerprint,
                 isThumbnailFallback: Boolean(prepared.isThumbnailFallback),
             });
             stack.bytes += bytes;
@@ -1774,7 +1774,7 @@
                     const prepared = await normalizeImage(downloaded.blob);
                     if (state.cancelled) throw new Error("Görsel hazırlama iptal edildi");
                     diagnostic("candidate_prepared", { candidateSource: candidate.source || "unknown", mime: downloaded.blob && downloaded.blob.type || "unknown", width: prepared.width, height: prepared.height, totalBytes: prepared.blob && prepared.blob.size || 0 });
-                    return Object.assign({ source: candidate.source, isThumbnailFallback: Boolean(candidate.isThumbnailFallback) }, prepared);
+                    return Object.assign({ source: candidate.source, candidateUrl: candidate.url, isThumbnailFallback: Boolean(candidate.isThumbnailFallback) }, prepared);
                 } catch (error) {
                     state.activeRequest = null;
                     if (state.cancelled) throw error;
@@ -1851,6 +1851,7 @@
                 if (stacked.added && stacked.state.count >= 2) stackCursor.show(lastPointer, stacked.state.count);
                 let message = (prepared.isThumbnailFallback ? "Önizleme kopyalandı: " : "Kopyalandı: ") + prepared.width + "×" + prepared.height;
                 if (stacked.reason === "byte-limit") message += " · Son Kopyalar'a sığmadı";
+                if (stacked.reason === "duplicate") message += " · Son Kopyalar'da zaten var";
                 notify(message, stacked.reason ? "progress" : "success");
                 diagnostic("copy_complete", { flowId: copyFlowId, width: prepared.width, height: prepared.height, totalBytes: prepared.blob && prepared.blob.size || 0, candidateSource: prepared.source || "unknown" });
                 return {

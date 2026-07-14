@@ -11,8 +11,9 @@ private let maxItems = 10
 private let maxBytes = 150 * 1024 * 1024
 private let headerLimit = 16 * 1024
 private let frameContentType = "application/vnd.koppy.images+binary"
+private let diagnosticsContentType = "application/vnd.koppy.diagnostics+json"
 private let clientHeader = "tampermonkey-v1"
-private let bridgeVersion = "0.5.3"
+private let bridgeVersion = "0.5.5"
 private var bridgeRequestCount = 0
 private var lastBridgePath = "none"
 private var lastBridgeStatus = 0
@@ -85,6 +86,33 @@ private func recentDiagnostics() -> [[String: Any]] {
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
         return object
     }
+}
+
+private func recordBrowserDiagnostics(_ body: Data) throws -> Int {
+    guard body.count <= 32 * 1024,
+          let payload = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
+          let recent = payload["recent"] as? [[String: Any]] else {
+        throw BridgeError.badRequest("tanı gövdesi geçersiz")
+    }
+    let allowedText = Set(["outcome", "transport", "route", "candidateSource", "candidateKind", "mime", "errorCode", "errorKind"])
+    let allowedNumber = Set(["status", "durationMs", "imageCount", "totalBytes", "attempt", "width", "height"])
+    var accepted = 0
+    for entry in recent.suffix(20) {
+        guard let name = entry["event"] as? String,
+              name.range(of: "^[A-Za-z0-9_-]{1,60}$", options: .regularExpression) != nil else { continue }
+        var fields: [String: Any] = ["source": "browser"]
+        for (key, value) in entry {
+            if allowedText.contains(key), let text = value as? String,
+               text.count <= 80, !text.contains("://"), !text.lowercased().contains("token") {
+                fields[key] = text
+            } else if allowedNumber.contains(key), let number = value as? NSNumber {
+                fields[key] = number
+            }
+        }
+        recordDiagnostic("browser_" + name, fields: fields)
+        accepted += 1
+    }
+    return accepted
 }
 
 private func requestResult(_ request: Request, status: Int, imageCount: Int? = nil) {
@@ -256,11 +284,22 @@ private func handle(_ fd: Int32, token: String) {
             response(fd, status: 200, payload: ["ok": true, "token": token])
             return
         }
-        if request.method == "GET", request.path == "/v1/diagnostics" {
+        if request.path == "/v1/diagnostics" {
             let auth = request.headers["authorization"] ?? ""
             guard auth.hasPrefix("Bearer "), constantTimeEqual(String(auth.dropFirst(7)), token) else { throw BridgeError.unauthorized }
+            if request.method == "GET" {
+                requestResult(request, status: 200)
+                response(fd, status: 200, payload: ["ok": true, "events": recentDiagnostics()])
+                return
+            }
+            guard request.method == "POST", request.headers["content-type"]?.lowercased() == diagnosticsContentType else {
+                requestResult(request, status: 415)
+                response(fd, status: 415, payload: ["ok": false, "error": "geçersiz tanı içeriği"])
+                return
+            }
+            let accepted = try recordBrowserDiagnostics(request.body)
             requestResult(request, status: 200)
-            response(fd, status: 200, payload: ["ok": true, "events": recentDiagnostics()])
+            response(fd, status: 200, payload: ["ok": true, "accepted": accepted])
             return
         }
         guard request.method == "POST", request.path == "/v1/images" else {

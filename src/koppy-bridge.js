@@ -14,6 +14,7 @@
     const MAX_ITEMS = 10;
     const MAX_BYTES = 150 * 1024 * 1024;
     const FRAME_TYPE = "application/vnd.koppy.images+binary";
+    const DIAGNOSTICS_TYPE = "application/vnd.koppy.diagnostics+json";
 
     function error(message, code) {
         const output = new Error("Koppy Bridge v" + SCRIPT_VERSION + ": " + message);
@@ -39,6 +40,22 @@
         if (/abort|cancel/.test(message)) return { code: "bridge-aborted", kind: "aborted", message: "yerel yardımcı isteği iptal edildi" };
         if (/permission|connect|network|refused|cors/.test(message)) return { code: "bridge-unreachable", kind: "network", message: "yerel yardımcıya bağlanılamadı" };
         return { code: "bridge-unreachable", kind: "unknown", message: "yerel yardımcıya bağlanılamadı" };
+    }
+
+    function redactedDiagnostics(snapshot) {
+        const textFields = new Set(["outcome", "transport", "route", "candidateSource", "candidateKind", "mime", "errorCode", "errorKind"]);
+        const numberFields = new Set(["status", "durationMs", "imageCount", "totalBytes", "attempt", "width", "height"]);
+        const source = snapshot && Array.isArray(snapshot.recent) ? snapshot.recent.slice(-20) : [];
+        return source.map(entry => {
+            const name = String(entry && entry.event || "");
+            if (!/^[a-z0-9_-]{1,60}$/i.test(name)) return null;
+            const item = { event: name };
+            for (const [key, value] of Object.entries(entry || {})) {
+                if (textFields.has(key) && typeof value === "string" && value.length <= 80 && !/(:\/\/|token|authorization|cookie|data:)/i.test(value)) item[key] = value;
+                if (numberFields.has(key) && Number.isFinite(Number(value))) item[key] = Math.max(0, Math.round(Number(value)));
+            }
+            return item;
+        }).filter(Boolean);
     }
 
     function parseJson(response) {
@@ -181,6 +198,19 @@
             }, settings, context);
             return parseJson(response);
         }
+        async function reportDiagnostics(snapshot) {
+            const token = cachedToken || await getToken(settings, { flowId: "diagnostics", attempt: 1 });
+            cachedToken = token;
+            const recent = redactedDiagnostics(snapshot);
+            const response = await gmCall(settings.gmRequest, {
+                method: "POST", url: ORIGIN + "/v1/diagnostics",
+                data: JSON.stringify({ schema: 1, recent }),
+                headers: { "Authorization": "Bearer " + token, "Content-Type": DIAGNOSTICS_TYPE }, timeout: 4000,
+            }, settings, { flowId: "diagnostics", attempt: 1 });
+            const payload = parseJson(response);
+            if (!payload || payload.ok !== true) throw error("tanı günlüğü doğrulanamadı", "diagnostics-invalid-response");
+            return payload;
+        }
         async function writeImages(items) {
             const flowId = settings.diagnostics && typeof settings.diagnostics.flowId === "function"
                 ? settings.diagnostics.flowId()
@@ -220,7 +250,7 @@
             diagnostic(settings, "bridge_batch_complete", { flowId, imageCount: payload.count, totalBytes });
             return { count: payload.count };
         }
-        return { writeImages, health, frameImages: items => frameImages(items, BlobCtor) };
+        return { writeImages, health, reportDiagnostics, frameImages: items => frameImages(items, BlobCtor) };
     }
 
     return { FRAME_TYPE, MAX_BYTES, MAX_ITEMS, ORIGIN, SCRIPT_VERSION, TOKEN_KEY, create, frameImages };

@@ -176,7 +176,7 @@ test("QuickHover resolves any site's original first and falls back to the visibl
     assert.equal(Koppy.resolveQuickHoverImageCandidates(image, { baseUrl: dom.window.location.href })[0].url, image.src);
 });
 
-test("copy feedback moves from the source thumbnail to the visible QuickHover preview", () => {
+test("copy feedback stays on its source instead of a stale global QuickHover preview", () => {
     const dom = new JSDOM(`<!doctype html><body>
         <img id="source" src="https://images.example.test/thumb.jpg">
         <span class="pv-pic-window-container preview"><span class="pv-pic-window-imgbox"><img class="pv-pic-window-pic"></span></span>
@@ -192,12 +192,10 @@ test("copy feedback moves from the source thumbnail to the visible QuickHover pr
 
     const indicator = document.getElementById("koppy-copy-feedback");
     const sourceOutline = document.querySelector(".koppy-copy-source-outline");
-    assert.equal(indicator.style.left, "300px");
-    assert.equal(indicator.style.top, "546px");
-    assert.equal(indicator.style.width, "600px");
-    assert.equal(sourceOutline.style.display, "block");
-    assert.equal(sourceOutline.style.left, "22px");
-    assert.equal(sourceOutline.style.top, "30px");
+    assert.equal(indicator.style.left, "24px");
+    assert.equal(indicator.style.top, "108px");
+    assert.equal(indicator.style.width, "120px");
+    assert.equal(sourceOutline.style.display, "none");
 });
 
 test("Cmd+C copies a QuickHover image on a non-Google site and reports on-image progress", async () => {
@@ -242,7 +240,7 @@ test("Cmd+C copies a QuickHover image on a non-Google site and reports on-image 
     assert.deepEqual(feedback.at(-1), ["complete", 2048, 1365]);
 });
 
-test("Recent Copies retains normal Cmd+C results and accepts a later explicit batch decision", async () => {
+test("Recent Copies retains normal Cmd+C results but dedupes retried sources", async () => {
     const dom = new JSDOM(`<!doctype html><img id="image" width="320" height="200" src="https://images.example.test/source.jpg">`, {
         url: "https://en.wikipedia.org/wiki/Example",
     });
@@ -250,6 +248,7 @@ test("Recent Copies retains normal Cmd+C results and accepts a later explicit ba
     const clipboardWrites = [];
     class ClipboardItemMock { constructor(data) { this.data = data; } }
     const accepted = [];
+    let originalUrl = "https://images.example.test/original-a.png";
     const controller = Koppy.createController({
         document: dom.window.document,
         window: dom.window,
@@ -263,7 +262,7 @@ test("Recent Copies retains normal Cmd+C results and accepts a later explicit ba
         },
         ClipboardItem: ClipboardItemMock,
         notify() {},
-        resolvePic: () => ({ src: "https://images.example.test/original.png", type: "rule" }),
+        resolvePic: () => ({ src: originalUrl, type: "rule" }),
         requestImage: () => ({ promise: Promise.resolve({ blob: new Blob(["input"], { type: "image/jpeg" }) }), abort() {} }),
         normalizeImage: async () => ({ blob: new Blob(["stack-png"], { type: "image/png" }), width: 2048, height: 1365 }),
         onRecentCopiesAccepted(items, state) { accepted.push({ items, state }); },
@@ -274,13 +273,18 @@ test("Recent Copies retains normal Cmd+C results and accepts a later explicit ba
     controller.setHoveredImage(image);
     const copy = await controller.copyHoveredImage({ key: "c", metaKey: true, target: dom.window.document.body, preventDefault() {}, stopImmediatePropagation() {} });
     const secondCopy = await controller.copyHoveredImage({ key: "c", metaKey: true, target: dom.window.document.body, preventDefault() {}, stopImmediatePropagation() {} });
+    originalUrl = "https://images.example.test/original-b.png";
+    controller.setHoveredImage(image, true);
+    const thirdCopy = await controller.copyHoveredImage({ key: "c", metaKey: true, target: dom.window.document.body, preventDefault() {}, stopImmediatePropagation() {} });
 
     assert.equal(copy.status, "copied");
     assert.equal(copy.stacked, true);
     assert.equal(copy.stack.count, 1);
-    assert.equal(secondCopy.stack.count, 2);
-    assert.equal(secondCopy.stack.ready, true);
-    assert.equal(clipboardWrites.length, 2);
+    assert.equal(secondCopy.stacked, false);
+    assert.equal(secondCopy.stack.count, 1);
+    assert.equal(thirdCopy.stack.count, 2);
+    assert.equal(thirdCopy.stack.ready, true);
+    assert.equal(clipboardWrites.length, 3);
     assert.equal(clipboardWrites[0].type, "image/png");
     assert.equal(clipboardWrites[0].size, 9);
 
@@ -291,7 +295,7 @@ test("Recent Copies retains normal Cmd+C results and accepts a later explicit ba
     assert.equal(accepted[0].state.count, 2);
     controller.clearStack();
     assert.equal(controller.getStackState().count, 0);
-    assert.equal(clipboardWrites.length, 2, "clearing Recent Copies must not write or clear the system clipboard");
+    assert.equal(clipboardWrites.length, 3, "clearing Recent Copies must not write or clear the system clipboard");
     assert.equal(stackEvents.at(-1).count, 0);
 });
 

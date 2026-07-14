@@ -18,6 +18,9 @@
     const events = [];
     let persist = null;
     let persistTimer = null;
+    let report = null;
+    let reportTimer = null;
+    const REPORTABLE_EVENTS = new Set(["copy_complete", "copy_failed", "stack_delivery_complete", "stack_delivery_failed", "bridge_recovery_failed"]);
 
     function boundedNumber(value, maximum) {
         const number = Number(value);
@@ -65,6 +68,13 @@
             }, 350);
             if (persistTimer && typeof persistTimer.unref === "function") persistTimer.unref();
         }
+        if (REPORTABLE_EVENTS.has(item.event) && typeof report === "function" && !reportTimer) {
+            reportTimer = setTimeout(() => {
+                reportTimer = null;
+                try { report(snapshot()); } catch (_) {}
+            }, 500);
+            if (reportTimer && typeof reportTimer.unref === "function") reportTimer.unref();
+        }
         return item;
     }
 
@@ -96,6 +106,7 @@
     function configure(options) {
         const settings = options || {};
         persist = typeof settings.persist === "function" ? settings.persist : null;
+        report = typeof settings.report === "function" ? settings.report : null;
     }
 
     return { MAX_EVENTS, clear, configure, flowId, record, snapshot, summaryText };

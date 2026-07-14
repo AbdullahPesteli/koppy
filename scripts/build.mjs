@@ -75,7 +75,7 @@ const replacements = new Map([
     ["// @name:pt-BR           Picviewer CE+", "// @name:pt-BR           Koppy"],
     ["// @name:ru              Picviewer CE+", "// @name:ru              Koppy"],
     ["// @author               NLF && ywzhaiqi && hoothin", "// @author               NLF && ywzhaiqi && hoothin; Koppy fork by pestly"],
-    ["// @version              2026.2.6.1", "// @version              0.5.4"],
+    ["// @version              2026.2.6.1", "// @version              0.5.5"],
     ["// @namespace            https://github.com/hoothin/UserScripts", "// @namespace            https://github.com/AbdullahPesteli/koppy"],
     ["// @homepage             https://pv.hoothin.com/", "// @homepage             https://github.com/AbdullahPesteli/koppy"],
     ["// @supportURL           https://github.com/hoothin/UserScripts/issues", "// @supportURL           https://github.com/AbdullahPesteli/koppy/issues"],
@@ -296,8 +296,11 @@ const bridgeValueAliases = `        const _GM_getValue = typeof GM_getValue === 
         if (globalThis.KoppyDiagnostics && typeof globalThis.KoppyDiagnostics.configure === "function") {
             globalThis.KoppyDiagnostics.configure({
                 persist: snapshot => _GM_setValue("koppy.diagnostics.v1", JSON.stringify(snapshot)),
+                report: snapshot => globalThis.KoppyBridgeReporter && globalThis.KoppyBridgeReporter(snapshot),
             });
         }
+`;
+const diagnosticReporterIntegration = `        globalThis.KoppyBridgeReporter = snapshot => koppyBridge.reportDiagnostics(snapshot).catch(() => {});
 `;
 const controlDeckIntegration = `        const koppyOpenUpdate = () => _GM_openInTab(${JSON.stringify(updateUrl)}, {active:true});
         const koppyCopyDiagnostics = () => {
@@ -325,7 +328,7 @@ const controlDeckIntegration = `        const koppyOpenUpdate = () => _GM_openIn
         _GM_registerMenuCommand("Koppy · Tanı özetini kopyala", koppyCopyDiagnostics);
 
 `;
-source = source.replace(marker, bridgeValueAliases + integration + controlDeckIntegration + marker);
+source = source.replace(marker, bridgeValueAliases + integration + controlDeckIntegration + diagnosticReporterIntegration + marker);
 
 fs.mkdirSync(outputDir, { recursive: true });
 fs.writeFileSync(outputPath, source);

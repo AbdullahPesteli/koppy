@@ -157,7 +157,7 @@ test("Recent Copies keeps normal clipboard behavior and exposes a magnetic, clic
             location,
             navigator,
             ClipboardItem,
-            resolvePic: () => ({ src: "https://images.example.test/original.png", type: "rule" }),
+            resolvePic: () => ({ src: window.__stackSource || "https://images.example.test/original-a.png", type: "rule" }),
             requestImage: () => {
                 window.__stackRequests += 1;
                 return { promise: Promise.resolve({ blob: png }), abort() {} };
@@ -171,6 +171,10 @@ test("Recent Copies keeps normal clipboard behavior and exposes a magnetic, clic
     await page.keyboard.press("Meta+C");
     await expect.poll(() => page.evaluate(() => window.__stackRequests)).toBe(1);
     await expect.poll(() => page.evaluate(() => window.__stackController.getStackState().count)).toBe(1);
+    await page.evaluate(() => {
+        window.__stackSource = "https://images.example.test/original-b.png";
+        window.__stackController.setHoveredImage(document.getElementById("image"), true);
+    });
     await page.keyboard.press("Meta+C");
     await expect.poll(() => page.evaluate(() => window.__stackController.getStackState().count)).toBe(2);
     await page.waitForTimeout(160);
