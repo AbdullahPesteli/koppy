@@ -48,7 +48,8 @@ geri bildirimi ve toast içinde `Stack’e eklendi (N)` görünür; böylece ayn
 Hızlı başlangıç için görsel üzerindeyken `⌘⌥C` bas: normal PNG kopyası yapılır, Stack açılır ve küçük kart
 imlecin yanındaki `▣ 1` rozetine uçar. Kısayol Türkçe macOS klavyesinde de karaktere değil fiziksel C
 tuşuna bağlıdır. Sonraki normal `⌘C` kopyaları sayıyı artırır; rozet sayfada imleci
-takip eder. Rozet gerçek macOS cursor’u değildir, cursor davranışını değiştirmeyen sayfa katmanıdır.
+takip eder. Arkasındaki üç küçük kart/dot, hareket yönüne gecikmeli kuyruk yapar. Rozet gerçek macOS
+cursor’u değildir, cursor davranışını değiştirmeyen sayfa katmanıdır.
 
 Hover yalnız URL adayını çözer; ağ/decode işlemi `Cmd+C` öncesinde başlamaz. Google'da Koppy, Picviewer'ın
 çözdüğü kaynakla birlikte bağlantı parametreleri, güncel metadata, lazy-load alanları, `picture`/`srcset` ve

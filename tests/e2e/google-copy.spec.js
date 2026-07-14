@@ -194,14 +194,26 @@ test("Stack mode keeps the regular clipboard as one current PNG while retaining 
     expect(result.feedback).toContain("Kopyalandı · 320×180");
     expect(result.stackChip).toBe("+1 Stack · 2 görsel");
     expect(result.collector).toBe("▣ 2");
-    fs.mkdirSync(path.resolve("test-results"), { recursive: true });
-    await page.screenshot({ path: "test-results/koppy-stack-feedback.png" });
-    await page.mouse.move(500, 300);
+    for (let x = 240; x <= 500; x += 20) await page.mouse.move(x, 120 + Math.round(x * .35));
+    await page.waitForTimeout(220);
     const collectorPosition = await page.evaluate(() => {
         const collector = document.querySelector("#koppy-stack-cursor");
-        return { left: collector.style.left, top: collector.style.top, display: collector.style.display };
+        const tails = Array.from(document.querySelectorAll(".koppy-stack-cursor-tail"));
+        return {
+            left: collector.style.left,
+            top: collector.style.top,
+            display: collector.style.display,
+            tailDisplays: tails.map(tail => tail.style.display),
+            tailPositions: tails.map(tail => tail.style.left + ":" + tail.style.top),
+        };
     });
-    expect(collectorPosition).toEqual({ left: "500px", top: "300px", display: "block" });
+    expect(collectorPosition.left).toBe("500px");
+    expect(collectorPosition.top).toBe("295px");
+    expect(collectorPosition.display).toBe("block");
+    expect(collectorPosition.tailDisplays).toEqual(["block", "block", "block"]);
+    expect(new Set(collectorPosition.tailPositions).size).toBeGreaterThan(1);
+    fs.mkdirSync(path.resolve("test-results"), { recursive: true });
+    await page.screenshot({ path: "test-results/koppy-stack-feedback.png" });
 
     const cleared = await page.evaluate(() => window.__stackController.clearStack());
     expect(cleared).toMatchObject({ enabled: true, count: 0, bytes: 0 });

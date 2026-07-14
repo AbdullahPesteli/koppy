@@ -1071,6 +1071,8 @@
         const doc = documentLike;
         const win = windowLike || (doc && doc.defaultView);
         let root;
+        const tails = [];
+        const pointerHistory = [];
 
         function reducedMotion() {
             return Boolean(win && typeof win.matchMedia === "function" && win.matchMedia("(prefers-reduced-motion: reduce)").matches);
@@ -1088,8 +1090,35 @@
                 font: "700 11px/1 -apple-system, BlinkMacSystemFont, sans-serif", whiteSpace: "nowrap",
                 transform: "translate(12px, 12px) scale(.92)", opacity: "0", transition: "opacity 160ms ease, transform 160ms ease",
             });
+            for (let index = 0; index < 3; index += 1) {
+                const tail = doc.createElement("div");
+                tail.className = "koppy-stack-cursor-tail";
+                tail.setAttribute("aria-hidden", "true");
+                const size = 11 - index * 2;
+                Object.assign(tail.style, {
+                    position: "fixed", display: "none", left: "0", top: "0", zIndex: "2147483646", pointerEvents: "none",
+                    width: size + "px", height: size - 1 + "px", borderRadius: "4px", opacity: String(.58 - index * .14),
+                    border: "1px solid rgba(124,156,255," + (.55 - index * .12) + ")", background: "rgba(38,53,87," + (.72 - index * .12) + ")",
+                    boxShadow: "0 2px 7px rgba(0,0,0,.15)", transform: "translate(-50%, -50%) scale(" + (1 - index * .1) + ") rotate(" + (index ? "-8deg" : "0deg") + ")",
+                    transition: "left " + (90 + index * 45) + "ms cubic-bezier(.2,.8,.2,1), top " + (90 + index * 45) + "ms cubic-bezier(.2,.8,.2,1), opacity 160ms ease",
+                });
+                tails.push(tail);
+                doc.documentElement.appendChild(tail);
+            }
             doc.documentElement.appendChild(root);
             return root;
+        }
+
+        function updateTail(pointer) {
+            if (!pointer || reducedMotion()) return;
+            pointerHistory.unshift({ x: Number(pointer.x) || 0, y: Number(pointer.y) || 0 });
+            if (pointerHistory.length > 18) pointerHistory.length = 18;
+            tails.forEach((tail, index) => {
+                const delayed = pointerHistory[Math.min(pointerHistory.length - 1, (index + 1) * 5)] || pointerHistory[0];
+                tail.style.left = Math.round(delayed.x) + "px";
+                tail.style.top = Math.round(delayed.y) + "px";
+                tail.style.display = "block";
+            });
         }
 
         function place(pointer) {
@@ -1107,12 +1136,15 @@
             item.style.display = "block";
             item.style.opacity = "1";
             item.style.transform = "translate(12px, 12px) scale(1)";
+            updateTail(pointer);
         }
 
         function hide() {
             if (!root) return;
             root.style.display = "none";
             root.style.opacity = "0";
+            pointerHistory.length = 0;
+            tails.forEach(tail => { tail.style.display = "none"; });
         }
 
         function collect(source, pointer, count) {

@@ -53,6 +53,9 @@ Koppy, görsel işi sırasında arka planda güvenilir kalan kişisel bir araçt
   kısayoludur. Başarılı kart, kaynağın merkezinden imlecin yaklaşık 12px sağ-altında beliren `▣ N`
   rozetine 380ms’de küçülerek gider; rozet Stack açık ve boş değilken imleci takip eder. Bu gerçek OS
   cursor’unu değiştirmez; sayfa üstündeki pointer-events kapalı bir eşlikçi katmandır.
+- Collector rozeti görünürken imlecin konum geçmişinden gelen üç küçük, gittikçe solan kart/dot arkada
+  gecikmeli bir kuyruk oluşturur. Kuyruk hızlı hareketle uzar, imleç durunca yaklaşır; bu işlevsel Stack
+  durumunun tatlı ama sakin hareketidir, reduced-motion tercihinde hiç çizilmez.
 - Tampermonkey menüsünden açılan **Canlı Kontrol**, tam ayar penceresinin yerine geçen ikinci bir form değildir:
   yalnız önizleme tuşu, FloatBar konumu ve preview boyutu için küçük, sayfaya ilişen bir kontrol yüzeyidir.
   Seçim gerçek `prefs` değerine kullanıcı tıklamasıyla anında yazılır; açık FloatBar/preview varsa değişiklik
