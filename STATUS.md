@@ -1,6 +1,6 @@
 # Koppy — Durum
 
-**Sürüm:** 0.4.13
+**Sürüm:** 0.4.14
 **Lisans:** MIT
 **Dağıtım:** `dist/Koppy.user.js` üzerinden Tampermonkey
 
@@ -64,5 +64,6 @@
 - 0.4.11: Zen’le çakışan `⌘⌥C` kaldırıldı. İki hızlı normal `⌘C`, ilk kopyayı da geriye dönük Stack’e alan burst akışını başlatır; her ekleme 2,4 saniyelik soğuma çizgisini yeniler. Soğuyunca `Hazır N` park durumu olur ve kuyruk kapanır. Aktif burst’te `Esc` Stack’i temizler, pano korunur. Browser E2E burst başlangıcını, cooldown parkını, rozet/kuyruk görünümünü ve tek PNG pano sonucunu doğrular.
 - 0.4.12: Zaman baskılı Stack burst/cooldown kaldırıldı. Her normal `Cmd+C` sessiz Son Kopyalar listesine girer. İkinci öğeden sonra `▣ N` rozeti uzaklaşan imleci yumuşak takip eder; imleç rozete yönelince frenleyip sabitlenen, tek tıklanabilir hedefe dönüşür. Unit ve browser E2E normal tek-PNG panoyu, iki öğeli listeyi, magnetic rozetin tıklanmasını ve temizliğin panoya dokunmamasını doğrular.
 - 0.4.13: Yakalanan rozet hover'da daha belirgin hale gelir. Rozetten çıkış, eski konumda kalmak yerine pointerleave anında takip moduna geri döner; E2E bu geri dönüşü doğrular. Hata ve geçici bilgi toast'ları daraltılıp uzun URL/mesajlarda satır kırar.
+- 0.4.14: Rozete doğru yönelmek artık tek başına yakalama sayılmaz. Rozet önce kısa bir yaklaşma bekler; yalnız 110 ms gerçek hover'dan sonra seçim moduna girer. Casual mouse geçişi/uzaklaşması takip moduna döner; E2E hem false-catch çıkışını hem gerçek hover ile seçimi doğrular.
 - 2026-07-14 araştırması: macOS `NSPasteboard` birden fazla bağımsız öğe yazabilir; ancak web Clipboard API spesifikasyonu `write()` çağrısında son `ClipboardItem`'ı seçer, Firefox extension API'sinde de `additionalItems` yoktur. Bu nedenle sonradan karar verilen çoklu-görsel yapıştırma, Tampermonkey tek başına değil opt-in yerel Koppy Bridge ile gerçekçi ve doğrulanabilir bir yoldur.
 - Tampermonkey kurulum sayfası Zen'de arka planda açıldı. İlk kurulumdan sonra **Automatic installation** açık olmalıdır.

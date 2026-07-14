@@ -213,9 +213,16 @@ test("Recent Copies keeps normal clipboard behavior and exposes a magnetic, clic
     expect(following.display).toBe("block");
     const badge = await page.locator("#koppy-stack-cursor").boundingBox();
     await page.mouse.move(Math.round(badge.x - 86), Math.round(badge.y + badge.height / 2));
-    const waitingBadge = await page.locator("#koppy-stack-cursor").boundingBox();
-    await page.mouse.move(Math.round(waitingBadge.x + waitingBadge.width / 2), Math.round(waitingBadge.y + waitingBadge.height / 2));
+    await page.waitForTimeout(130);
+    await expect.poll(() => page.evaluate(() => document.querySelector("#koppy-stack-cursor").style.pointerEvents)).toBe("none");
+    const waitingPoint = await page.evaluate(() => {
+        const badge = document.querySelector("#koppy-stack-cursor");
+        return { x: Number.parseInt(badge.style.left, 10), y: Number.parseInt(badge.style.top, 10) };
+    });
+    await page.mouse.move(waitingPoint.x, waitingPoint.y);
     await expect.poll(() => page.evaluate(() => document.querySelector("#koppy-stack-cursor").style.pointerEvents)).toBe("auto");
+    await page.mouse.move(waitingPoint.x + 1, waitingPoint.y + 1);
+    await page.waitForTimeout(140);
     await page.locator("#koppy-stack-cursor").click();
     await expect.poll(() => page.evaluate(() => window.__stackController.getStackState().accepted)).toBe(true);
     const captured = await page.locator("#koppy-stack-cursor").boundingBox();

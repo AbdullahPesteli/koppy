@@ -1081,7 +1081,8 @@
         let lastPointer = null;
         let mode = "follow";
         let visibleCount = 0;
-        let hovered = false;
+        let pointerOver = false;
+        let hoverTimer;
         let selectionTimer;
 
         function reducedMotion() {
@@ -1105,13 +1106,15 @@
             label = doc.createElement("span");
             root.appendChild(label);
             root.addEventListener("pointerenter", () => {
-                hovered = true;
-                updateVisual();
+                pointerOver = true;
+                beginCaptureIntent();
             });
             root.addEventListener("pointerleave", event => {
-                hovered = false;
-                // A captured badge must never strand itself at its old world
-                // position. Leaving it explicitly hands control back to follow.
+                pointerOver = false;
+                clearTimeout(hoverTimer);
+                hoverTimer = null;
+                // A candidate or captured badge must never strand itself at its
+                // old world position. Leaving it immediately resumes follow.
                 releaseToFollow({ x: event.clientX, y: event.clientY });
             });
             root.addEventListener("click", event => {
@@ -1135,12 +1138,13 @@
         function updateVisual() {
             if (!root) return;
             const captured = mode === "capture";
-            root.style.pointerEvents = captured ? "auto" : "none";
+            const approaching = mode === "approach";
+            root.style.pointerEvents = captured || approaching ? "auto" : "none";
             root.style.cursor = captured ? "pointer" : "default";
-            root.style.transform = "translate(-50%, -50%) scale(" + (captured ? (hovered ? "1.1" : "1") : ".92") + ")";
-            root.style.borderColor = captured ? (hovered ? "rgba(221,229,255,1)" : "rgba(173,194,255,.98)") : "rgba(124,156,255,.72)";
-            root.style.background = captured && hovered ? "rgba(66,91,149,.98)" : "rgba(38,53,87,.94)";
-            root.style.boxShadow = captured ? "0 0 0 " + (hovered ? "7" : "5") + "px rgba(124,156,255,.17), 0 7px 20px rgba(0,0,0,.30)" : "0 5px 16px rgba(0,0,0,.25)";
+            root.style.transform = "translate(-50%, -50%) scale(" + (captured ? (pointerOver ? "1.1" : "1") : approaching ? ".96" : ".92") + ")";
+            root.style.borderColor = captured ? (pointerOver ? "rgba(221,229,255,1)" : "rgba(173,194,255,.98)") : approaching ? "rgba(147,174,255,.9)" : "rgba(124,156,255,.72)";
+            root.style.background = captured && pointerOver ? "rgba(66,91,149,.98)" : "rgba(38,53,87,.94)";
+            root.style.boxShadow = captured ? "0 0 0 " + (pointerOver ? "7" : "5") + "px rgba(124,156,255,.17), 0 7px 20px rgba(0,0,0,.30)" : approaching ? "0 0 0 3px rgba(124,156,255,.11), 0 5px 16px rgba(0,0,0,.25)" : "0 5px 16px rgba(0,0,0,.25)";
         }
 
         function show(pointer, count) {
@@ -1165,7 +1169,9 @@
             lastPointer = null;
             visibleCount = 0;
             mode = "follow";
-            hovered = false;
+            pointerOver = false;
+            clearTimeout(hoverTimer);
+            hoverTimer = null;
             clearTimeout(selectionTimer);
             selectionTimer = null;
         }
@@ -1186,9 +1192,33 @@
             return velocityX * toBadgeX + velocityY * toBadgeY > speed * distance * .32;
         }
 
+        function movingAway(pointer) {
+            if (!lastPointer || !companion) return false;
+            const velocityX = Number(pointer.x) - Number(lastPointer.x);
+            const velocityY = Number(pointer.y) - Number(lastPointer.y);
+            const toBadgeX = companion.x - Number(pointer.x);
+            const toBadgeY = companion.y - Number(pointer.y);
+            const speed = Math.hypot(velocityX, velocityY);
+            const distance = Math.hypot(toBadgeX, toBadgeY);
+            return speed > 1.5 && distance > 58 && velocityX * toBadgeX + velocityY * toBadgeY < 0;
+        }
+
+        function beginCaptureIntent() {
+            if (mode !== "approach" || !pointerOver || hoverTimer) return;
+            hoverTimer = setTimeout(() => {
+                hoverTimer = null;
+                if (mode !== "approach" || !pointerOver) return;
+                mode = "capture";
+                updateVisual();
+            }, reducedMotion() ? 0 : 110);
+        }
+
         function releaseToFollow(pointer) {
             if (!companion || !pointer) return;
             mode = "follow";
+            pointerOver = false;
+            clearTimeout(hoverTimer);
+            hoverTimer = null;
             const nextPointer = { x: Number(pointer.x) || 0, y: Number(pointer.y) || 0 };
             // Snap the virtual spring near the exit point. The next document
             // pointermove continues the companion motion without a dead zone.
@@ -1217,7 +1247,9 @@
             show(pointer, state.count);
             if (!root || !companion) return;
             const nextPointer = { x: Number(pointer.x) || 0, y: Number(pointer.y) || 0 };
-            if (mode === "follow" && movingToward(nextPointer)) mode = "capture";
+            const distance = Math.hypot(companion.x - nextPointer.x, companion.y - nextPointer.y);
+            if (mode === "follow" && movingToward(nextPointer)) mode = "approach";
+            else if (mode === "approach" && !pointerOver && (distance > 118 || movingAway(nextPointer))) releaseToFollow(nextPointer);
             if (mode === "follow") {
                 const target = { x: nextPointer.x + 34, y: nextPointer.y + 28 };
                 const strength = reducedMotion() ? 1 : .42;
