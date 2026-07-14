@@ -242,13 +242,14 @@ test("Cmd+C copies a QuickHover image on a non-Google site and reports on-image 
     assert.deepEqual(feedback.at(-1), ["complete", 2048, 1365]);
 });
 
-test("opt-in Stack retains copied PNGs without changing the single-image system clipboard", async () => {
+test("Recent Copies retains normal Cmd+C results and accepts a later explicit batch decision", async () => {
     const dom = new JSDOM(`<!doctype html><img id="image" width="320" height="200" src="https://images.example.test/source.jpg">`, {
         url: "https://en.wikipedia.org/wiki/Example",
     });
     const image = makeVisible(dom.window.document.getElementById("image"), 320, 200);
     const clipboardWrites = [];
     class ClipboardItemMock { constructor(data) { this.data = data; } }
+    const accepted = [];
     const controller = Koppy.createController({
         document: dom.window.document,
         window: dom.window,
@@ -265,27 +266,32 @@ test("opt-in Stack retains copied PNGs without changing the single-image system 
         resolvePic: () => ({ src: "https://images.example.test/original.png", type: "rule" }),
         requestImage: () => ({ promise: Promise.resolve({ blob: new Blob(["input"], { type: "image/jpeg" }) }), abort() {} }),
         normalizeImage: async () => ({ blob: new Blob(["stack-png"], { type: "image/png" }), width: 2048, height: 1365 }),
+        onRecentCopiesAccepted(items, state) { accepted.push({ items, state }); },
     });
     const stackEvents = [];
     controller.onStackChange(state => stackEvents.push(state));
-    assert.deepEqual(controller.getStackState(), { enabled: false, parked: false, count: 0, bytes: 0, maxItems: 10, maxBytes: 150 * 1024 * 1024 });
-    controller.setStackEnabled(true);
+    assert.deepEqual(controller.getStackState(), { enabled: false, parked: false, count: 0, bytes: 0, ready: false, accepted: false, maxItems: 10, maxBytes: 150 * 1024 * 1024 });
     controller.setHoveredImage(image);
     const copy = await controller.copyHoveredImage({ key: "c", metaKey: true, target: dom.window.document.body, preventDefault() {}, stopImmediatePropagation() {} });
+    const secondCopy = await controller.copyHoveredImage({ key: "c", metaKey: true, target: dom.window.document.body, preventDefault() {}, stopImmediatePropagation() {} });
 
     assert.equal(copy.status, "copied");
     assert.equal(copy.stacked, true);
     assert.equal(copy.stack.count, 1);
-    assert.equal(clipboardWrites.length, 1);
+    assert.equal(secondCopy.stack.count, 2);
+    assert.equal(secondCopy.stack.ready, true);
+    assert.equal(clipboardWrites.length, 2);
     assert.equal(clipboardWrites[0].type, "image/png");
     assert.equal(clipboardWrites[0].size, 9);
 
-    assert.equal(controller.start(), true);
-    const escape = new dom.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
-    dom.window.document.dispatchEvent(escape);
-    assert.equal(escape.defaultPrevented, true);
+    const selected = controller.acceptRecentCopies();
+    assert.equal(selected.accepted, true);
+    assert.equal(accepted.length, 1);
+    assert.equal(accepted[0].items.length, 2);
+    assert.equal(accepted[0].state.count, 2);
+    controller.clearStack();
     assert.equal(controller.getStackState().count, 0);
-    assert.equal(clipboardWrites.length, 1, "cancelling Koppy Stack must not write or clear the system clipboard");
+    assert.equal(clipboardWrites.length, 2, "clearing Recent Copies must not write or clear the system clipboard");
     assert.equal(stackEvents.at(-1).count, 0);
 });
 

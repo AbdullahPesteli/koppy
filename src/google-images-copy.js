@@ -11,14 +11,13 @@
     const MAX_IMAGE_BYTES = 80 * 1024 * 1024;
     const MAX_IMAGE_PIXELS = 40 * 1024 * 1024;
     const MAX_IMAGE_DIMENSION = 16384;
-    // Stack is intentionally an in-page, opt-in staging area. It never changes
-    // the system clipboard contract: every Cmd+C still writes just the latest
-    // portable PNG. These limits keep a long picking session from holding an
-    // unbounded amount of decoded image data in the tab.
+    // Recent copies are retained only inside this tab. Every Cmd+C still writes
+    // exactly one portable PNG to the system clipboard; the optional native
+    // Bridge will later turn an explicitly accepted list into multi-item paste.
+    // These limits prevent a long picking session from holding unbounded image
+    // data in memory.
     const MAX_STACK_ITEMS = 10;
     const MAX_STACK_BYTES = 150 * 1024 * 1024;
-    const STACK_BURST_WINDOW_MS = 1800;
-    const STACK_COOLDOWN_MS = 2400;
     const REQUEST_TIMEOUT_MS = 20000;
     const GOOGLE_HOSTNAMES = new Set(["google.com", "google.com.tr"]);
     const GOOGLE_METADATA_CACHE = new WeakMap();
@@ -1069,14 +1068,16 @@
         };
     }
 
-    function createStackCursorCollector(documentLike, windowLike) {
+    function createStackCursorCollector(documentLike, windowLike, options) {
         const doc = documentLike;
         const win = windowLike || (doc && doc.defaultView);
+        const onAccept = options && options.onAccept;
         let root;
         let label;
-        let cooldownBar;
-        const tails = [];
-        const pointerHistory = [];
+        let companion = null;
+        let lastPointer = null;
+        let mode = "follow";
+        let visibleCount = 0;
 
         function reducedMotion() {
             return Boolean(win && typeof win.matchMedia === "function" && win.matchMedia("(prefers-reduced-motion: reduce)").matches);
@@ -1084,139 +1085,113 @@
 
         function ensure() {
             if (root || !doc || !doc.documentElement) return root;
-            root = doc.createElement("div");
+            root = doc.createElement("button");
+            root.type = "button";
             root.id = "koppy-stack-cursor";
-            root.setAttribute("aria-hidden", "true");
+            root.setAttribute("aria-label", "Son kopyaları hazırla");
+            root.title = "Yaklaşınca sabitlenir · tıkla: son kopyaları seç";
             Object.assign(root.style, {
                 position: "fixed", display: "none", left: "0", top: "0", zIndex: "2147483647", pointerEvents: "none",
-                padding: "4px 7px", borderRadius: "999px", border: "1px solid rgba(124,156,255,.72)",
+                minWidth: "44px", minHeight: "36px", padding: "0 10px", borderRadius: "999px", border: "1px solid rgba(124,156,255,.72)",
                 color: "#eff3ff", background: "rgba(38,53,87,.94)", boxShadow: "0 5px 16px rgba(0,0,0,.25)",
-                font: "700 11px/1 -apple-system, BlinkMacSystemFont, sans-serif", whiteSpace: "nowrap",
-                transform: "translate(12px, 12px) scale(.92)", opacity: "0", overflow: "hidden", transition: "opacity 160ms ease, transform 160ms ease",
+                font: "700 11px/1 -apple-system, BlinkMacSystemFont, sans-serif", whiteSpace: "nowrap", cursor: "default",
+                transform: "translate(-50%, -50%) scale(.92)", opacity: "0", transition: "left 105ms cubic-bezier(.2,.8,.2,1), top 105ms cubic-bezier(.2,.8,.2,1), opacity 160ms ease, transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease",
             });
             label = doc.createElement("span");
             root.appendChild(label);
-            cooldownBar = doc.createElement("span");
-            Object.assign(cooldownBar.style, {
-                position: "absolute", display: "none", left: "0", right: "0", bottom: "0", height: "2px",
-                transformOrigin: "left", background: "#9db4ff", opacity: ".95",
+            root.addEventListener("click", event => {
+                if (mode !== "capture" || !visibleCount || typeof onAccept !== "function") return;
+                event.preventDefault();
+                onAccept(visibleCount);
             });
-            root.appendChild(cooldownBar);
-            for (let index = 0; index < 3; index += 1) {
-                const tail = doc.createElement("div");
-                tail.className = "koppy-stack-cursor-tail";
-                tail.setAttribute("aria-hidden", "true");
-                const size = 11 - index * 2;
-                Object.assign(tail.style, {
-                    position: "fixed", display: "none", left: "0", top: "0", zIndex: "2147483646", pointerEvents: "none",
-                    width: size + "px", height: size - 1 + "px", borderRadius: "4px", opacity: String(.58 - index * .14),
-                    border: "1px solid rgba(124,156,255," + (.55 - index * .12) + ")", background: "rgba(38,53,87," + (.72 - index * .12) + ")",
-                    boxShadow: "0 2px 7px rgba(0,0,0,.15)", transform: "translate(-50%, -50%) scale(" + (1 - index * .1) + ") rotate(" + (index ? "-8deg" : "0deg") + ")",
-                    transition: "left " + (90 + index * 45) + "ms cubic-bezier(.2,.8,.2,1), top " + (90 + index * 45) + "ms cubic-bezier(.2,.8,.2,1), opacity 160ms ease",
-                });
-                tails.push(tail);
-                doc.documentElement.appendChild(tail);
-            }
             doc.documentElement.appendChild(root);
             return root;
         }
 
-        function updateTail(pointer) {
-            if (!pointer || reducedMotion()) return;
-            pointerHistory.unshift({ x: Number(pointer.x) || 0, y: Number(pointer.y) || 0 });
-            if (pointerHistory.length > 18) pointerHistory.length = 18;
-            tails.forEach((tail, index) => {
-                const delayed = pointerHistory[Math.min(pointerHistory.length - 1, (index + 1) * 5)] || pointerHistory[0];
-                tail.style.left = Math.round(delayed.x) + "px";
-                tail.style.top = Math.round(delayed.y) + "px";
-                tail.style.display = "block";
-            });
-        }
-
-        function place(pointer) {
+        function place(point) {
             const item = ensure();
-            if (!item || !pointer) return null;
-            item.style.left = Math.round(Number(pointer.x) || 0) + "px";
-            item.style.top = Math.round(Number(pointer.y) || 0) + "px";
+            if (!item || !point) return null;
+            item.style.left = Math.round(point.x) + "px";
+            item.style.top = Math.round(point.y) + "px";
             return item;
         }
 
+        function updateVisual() {
+            if (!root) return;
+            const captured = mode === "capture";
+            root.style.pointerEvents = captured ? "auto" : "none";
+            root.style.cursor = captured ? "pointer" : "default";
+            root.style.transform = "translate(-50%, -50%) scale(" + (captured ? "1" : ".92") + ")";
+            root.style.borderColor = captured ? "rgba(173,194,255,.98)" : "rgba(124,156,255,.72)";
+            root.style.boxShadow = captured ? "0 0 0 5px rgba(124,156,255,.17), 0 7px 20px rgba(0,0,0,.30)" : "0 5px 16px rgba(0,0,0,.25)";
+        }
+
         function show(pointer, count) {
-            const item = place(pointer);
-            if (!item || !count) return;
-            label.textContent = "▣ " + count;
+            if (!pointer || Number(count) < 2) return hide();
+            const item = ensure();
+            if (!item) return;
+            visibleCount = Number(count) || 0;
+            label.textContent = "▣ " + visibleCount;
+            item.setAttribute("aria-label", visibleCount + " son kopyayı seç");
+            if (!companion) companion = { x: Number(pointer.x) + 34, y: Number(pointer.y) + 28 };
+            place(companion);
             item.style.display = "block";
             item.style.opacity = "1";
-            item.style.transform = "translate(12px, 12px) scale(1)";
-            updateTail(pointer);
+            updateVisual();
         }
 
         function hide() {
             if (!root) return;
             root.style.display = "none";
             root.style.opacity = "0";
-            pointerHistory.length = 0;
-            if (cooldownBar) cooldownBar.style.display = "none";
-            tails.forEach(tail => { tail.style.display = "none"; });
+            companion = null;
+            lastPointer = null;
+            visibleCount = 0;
+            mode = "follow";
         }
 
-        function collect(source, pointer, count) {
-            if (!pointer || !count) return;
-            const target = place(pointer);
-            if (!target) return;
-            const rect = source && typeof source.getBoundingClientRect === "function" ? source.getBoundingClientRect() : null;
-            if (!rect || !rect.width || !rect.height || reducedMotion()) {
-                show(pointer, count);
-                return;
+        function movingToward(pointer) {
+            if (!lastPointer || !companion) return false;
+            const velocityX = Number(pointer.x) - Number(lastPointer.x);
+            const velocityY = Number(pointer.y) - Number(lastPointer.y);
+            const toBadgeX = companion.x - Number(pointer.x);
+            const toBadgeY = companion.y - Number(pointer.y);
+            const speed = Math.hypot(velocityX, velocityY);
+            const distance = Math.hypot(toBadgeX, toBadgeY);
+            const previousDistance = Math.hypot(companion.x - Number(lastPointer.x), companion.y - Number(lastPointer.y));
+            // The user may land directly on the badge, where the direction vector
+            // becomes zero. A closing distance is still an intentional catch.
+            if (distance < 54 && previousDistance > distance + .5) return true;
+            if (speed < 1.5 || distance > 150) return false;
+            return velocityX * toBadgeX + velocityY * toBadgeY > speed * distance * .32;
+        }
+
+        function move(pointer, state) {
+            if (!state || Number(state.count) < 2) return hide();
+            show(pointer, state.count);
+            if (!root || !companion) return;
+            const nextPointer = { x: Number(pointer.x) || 0, y: Number(pointer.y) || 0 };
+            const distance = Math.hypot(companion.x - nextPointer.x, companion.y - nextPointer.y);
+            if (mode === "follow" && movingToward(nextPointer)) mode = "capture";
+            else if (mode === "capture" && distance > 132) mode = "follow";
+            if (mode === "follow") {
+                const target = { x: nextPointer.x + 34, y: nextPointer.y + 28 };
+                const strength = reducedMotion() ? 1 : .42;
+                companion.x += (target.x - companion.x) * strength;
+                companion.y += (target.y - companion.y) * strength;
             }
-            const ghost = doc.createElement("div");
-            ghost.textContent = "▣";
-            const startX = rect.left + rect.width / 2;
-            const startY = rect.top + rect.height / 2;
-            const endX = Number(pointer.x) + 16;
-            const endY = Number(pointer.y) + 16;
-            Object.assign(ghost.style, {
-                position: "fixed", left: Math.round(startX) + "px", top: Math.round(startY) + "px", zIndex: "2147483647", pointerEvents: "none",
-                width: "22px", height: "18px", display: "grid", placeItems: "center", borderRadius: "5px",
-                border: "1px solid rgba(124,156,255,.84)", color: "#dbe5ff", background: "rgba(38,53,87,.94)",
-                boxShadow: "0 4px 12px rgba(0,0,0,.22)", font: "700 11px/1 -apple-system, BlinkMacSystemFont, sans-serif",
-                transform: "translate(-50%, -50%) scale(1)", opacity: "1", transition: "transform 380ms cubic-bezier(.2,.8,.2,1), opacity 380ms ease",
-            });
-            doc.documentElement.appendChild(ghost);
-            const dx = endX - startX;
-            const dy = endY - startY;
-            const fly = () => {
-                ghost.style.transform = "translate(calc(-50% + " + Math.round(dx) + "px), calc(-50% + " + Math.round(dy) + "px)) scale(.38)";
-                ghost.style.opacity = "0";
-            };
-            if (win && typeof win.requestAnimationFrame === "function") win.requestAnimationFrame(fly);
-            else setTimeout(fly, 0);
-            setTimeout(() => {
-                if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
-                show(pointer, count);
-            }, 390);
+            place(companion);
+            updateVisual();
+            lastPointer = nextPointer;
         }
 
         return {
-            collect,
+            show,
             hide,
-            cooldown(duration) {
-                if (!root || root.style.display === "none" || !cooldownBar || reducedMotion()) return;
-                cooldownBar.style.display = "block";
-                cooldownBar.style.transition = "none";
-                cooldownBar.style.transform = "scaleX(1)";
-                const drain = () => {
-                    if (!cooldownBar) return;
-                    cooldownBar.style.transition = "transform " + Math.max(1, Number(duration) || 1) + "ms linear";
-                    cooldownBar.style.transform = "scaleX(0)";
-                };
-                if (win && typeof win.requestAnimationFrame === "function") win.requestAnimationFrame(drain);
-                else setTimeout(drain, 0);
-            },
-            move(pointer, state) {
-                if (!root || root.style.display === "none") return;
-                if (!state || !state.enabled || !state.count) return hide();
-                show(pointer, state.count);
+            move,
+            capture() {
+                mode = "capture";
+                updateVisual();
             },
         };
     }
@@ -1264,32 +1239,30 @@
             timeout: deps.timeout || REQUEST_TIMEOUT_MS,
             onProgress,
         }));
-        const burstWindowMs = Number.isFinite(Number(deps.stackBurstWindowMs)) ? Math.max(100, Number(deps.stackBurstWindowMs)) : STACK_BURST_WINDOW_MS;
-        const stackCooldownMs = Number.isFinite(Number(deps.stackCooldownMs)) ? Math.max(100, Number(deps.stackCooldownMs)) : STACK_COOLDOWN_MS;
         let current = null;
         let activeCopy = null;
         let activePreview = null;
         let documentPreview = null;
         let lastPointer = null;
         let started = false;
-        let burstCandidate = null;
-        let burstTimer = null;
-        let cooldownTimer = null;
-        const stackCursor = createStackCursorCollector(documentLike, windowLike);
         const stack = {
-            enabled: Boolean(deps.stackEnabled),
-            parked: false,
             items: [],
             bytes: 0,
+            accepted: false,
             listeners: new Set(),
         };
+        const stackCursor = createStackCursorCollector(documentLike, windowLike, { onAccept: acceptStack });
 
         function stackState() {
             return {
-                enabled: stack.enabled,
-                parked: stack.parked,
+                // Kept for older integrations. Recent Copies has no armed mode,
+                // cooldown or automatic clipboard action.
+                enabled: false,
+                parked: false,
                 count: stack.items.length,
                 bytes: stack.bytes,
+                ready: stack.items.length >= 2,
+                accepted: stack.accepted,
                 maxItems: MAX_STACK_ITEMS,
                 maxBytes: MAX_STACK_BYTES,
             };
@@ -1303,72 +1276,28 @@
             return state;
         }
 
-        function setStackEnabled(enabled) {
-            stack.enabled = Boolean(enabled);
-            stack.parked = false;
-            if (!stack.enabled) stopCooldown();
-            const state = emitStackChange();
-            if (!state.enabled || !state.count) stackCursor.hide();
-            return state;
-        }
-
-        function clearBurstCandidate() {
-            burstCandidate = null;
-            if (burstTimer) clearTimeout(burstTimer);
-            burstTimer = null;
-        }
-
-        function stopCooldown() {
-            if (cooldownTimer) clearTimeout(cooldownTimer);
-            cooldownTimer = null;
-        }
-
-        function parkStack() {
-            stopCooldown();
-            if (!stack.items.length) return;
-            stack.enabled = false;
-            stack.parked = true;
-            stackCursor.hide();
-            emitStackChange();
-            notify("Stack hazır: " + stack.items.length + " görsel", "success");
-        }
-
-        function restartStackCooldown() {
-            if (!stack.enabled || !stack.items.length) return;
-            stopCooldown();
-            stackCursor.cooldown(stackCooldownMs);
-            cooldownTimer = setTimeout(parkStack, stackCooldownMs);
-            if (cooldownTimer && typeof cooldownTimer.unref === "function") cooldownTimer.unref();
-        }
-
-        function rememberBurstCandidate(prepared, source) {
-            clearBurstCandidate();
-            burstCandidate = { prepared, source, pointer: lastPointer && { x: lastPointer.x, y: lastPointer.y }, at: Date.now() };
-            burstTimer = setTimeout(clearBurstCandidate, burstWindowMs);
-        }
-
         function clearStack() {
             // Blob references are the only retained resources. Dropping the array
             // releases them for garbage collection and deliberately leaves macOS'
             // existing clipboard untouched.
             stack.items = [];
             stack.bytes = 0;
-            stack.parked = false;
-            clearBurstCandidate();
-            stopCooldown();
+            stack.accepted = false;
             stackCursor.hide();
             return emitStackChange();
         }
 
         function addToStack(prepared) {
-            if (!stack.enabled) return { added: false, state: stackState() };
             const blob = prepared && prepared.blob;
             const bytes = Math.max(0, Number(blob && blob.size) || 0);
-            if (stack.items.length >= MAX_STACK_ITEMS) {
-                return { added: false, reason: "item-limit", state: stackState() };
-            }
-            if (bytes > MAX_STACK_BYTES || stack.bytes + bytes > MAX_STACK_BYTES) {
+            if (!blob || bytes > MAX_STACK_BYTES) {
                 return { added: false, reason: "byte-limit", state: stackState() };
+            }
+            let evicted = 0;
+            while (stack.items.length && (stack.items.length >= MAX_STACK_ITEMS || stack.bytes + bytes > MAX_STACK_BYTES)) {
+                const oldest = stack.items.shift();
+                stack.bytes -= Number(oldest && oldest.bytes) || 0;
+                evicted += 1;
             }
             stack.items.push({
                 blob,
@@ -1379,7 +1308,21 @@
                 isThumbnailFallback: Boolean(prepared.isThumbnailFallback),
             });
             stack.bytes += bytes;
-            return { added: true, state: emitStackChange() };
+            stack.accepted = false;
+            return { added: true, evicted, state: emitStackChange() };
+        }
+
+        function acceptStack() {
+            if (stack.items.length < 2) return stackState();
+            stack.accepted = true;
+            const state = emitStackChange();
+            stackCursor.capture();
+            if (typeof deps.onRecentCopiesAccepted === "function") {
+                try { deps.onRecentCopiesAccepted(stack.items.slice(), state); } catch (_) {}
+            } else {
+                notify("Son " + state.count + " kopya seçildi · çoklu pano için Koppy Bridge gerekiyor", "progress");
+            }
+            return state;
         }
 
         function cancelState(state) {
@@ -1720,28 +1663,13 @@
                     new ClipboardItemCtor({ "image/png": clipboardBlobPromise }),
                 ]));
                 const [prepared] = await Promise.all([preparedPromise, writePromise]);
-                let stacked;
-                if (stack.enabled) {
-                    stacked = addToStack(prepared);
-                } else if (burstCandidate && Date.now() - burstCandidate.at <= burstWindowMs) {
-                    // A second rapid ordinary copy starts the collector with both
-                    // images. One-off Cmd+C stays completely ordinary.
-                    const first = burstCandidate;
-                    clearBurstCandidate();
-                    setStackEnabled(true);
-                    addToStack(first.prepared);
-                    stacked = addToStack(prepared);
-                } else {
-                    rememberBurstCandidate(prepared, copyState.element);
-                    stacked = { added: false, state: stackState() };
-                }
-                feedback.complete(copyState.element, prepared.width, prepared.height, prepared.isThumbnailFallback, stacked);
-                if (stacked.added) stackCursor.collect(copyState.element, lastPointer, stacked.state.count);
-                if (stacked.added) restartStackCooldown();
+                const stacked = addToStack(prepared);
+                // Normal Cmd+C remains visually and behaviorally a normal copy.
+                // The only passive affordance is the calm two-or-more Copies badge.
+                feedback.complete(copyState.element, prepared.width, prepared.height, prepared.isThumbnailFallback, null);
+                if (stacked.added && stacked.state.count >= 2) stackCursor.show(lastPointer, stacked.state.count);
                 let message = (prepared.isThumbnailFallback ? "Önizleme kopyalandı: " : "Kopyalandı: ") + prepared.width + "×" + prepared.height;
-                if (stacked.added) message += " · Stack’e eklendi (" + stacked.state.count + ")";
-                else if (stack.enabled && stacked.reason === "item-limit") message += " · Stack dolu (" + MAX_STACK_ITEMS + ")";
-                else if (stack.enabled && stacked.reason === "byte-limit") message += " · Stack bellek sınırında";
+                if (stacked.reason === "byte-limit") message += " · Son Kopyalar'a sığmadı";
                 notify(message, stacked.reason ? "progress" : "success");
                 return {
                     status: "copied",
@@ -1766,14 +1694,6 @@
         }
 
         function onKeyDown(event) {
-            if (String(event && event.key || "") === "Escape" && stack.enabled && stack.items.length) {
-                event.preventDefault();
-                if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
-                else if (typeof event.stopPropagation === "function") event.stopPropagation();
-                clearStack();
-                notify("Stack iptal edildi · pano korunuyor", "success");
-                return;
-            }
             if (isDocumentPreviewGesture(event)) void previewHoveredDocument();
             void copyHoveredImage(event);
         }
@@ -1814,8 +1734,6 @@
                 }
                 cancelAll();
                 clearStack();
-                clearBurstCandidate();
-                stopCooldown();
                 started = false;
             },
             setHoveredImage,
@@ -1823,8 +1741,8 @@
             refreshRoute,
             getState() { return current; },
             getStackState: stackState,
-            setStackEnabled,
             clearStack,
+            acceptRecentCopies: acceptStack,
             onStackChange(listener) {
                 if (typeof listener !== "function") return () => {};
                 stack.listeners.add(listener);

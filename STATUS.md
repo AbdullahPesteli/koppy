@@ -1,6 +1,6 @@
 # Koppy — Durum
 
-**Sürüm:** 0.4.11
+**Sürüm:** 0.4.12
 **Lisans:** MIT
 **Dağıtım:** `dist/Koppy.user.js` üzerinden Tampermonkey
 
@@ -11,20 +11,20 @@
 - Kopyalama, mümkünse QuickHover'ın süzülen preview panelinde ince ilerleme çizgisi ve çözünürlüklü başarı bilgisi verir; küçük kaynak görsel yalnız ince hedef çerçevesi taşır. Metin kopyalamayı bozmaz.
 - QuickHover önizlemesi boş boyut ayarında ekranı kaplamak yerine yaklaşık ekranın %72'sine sığar; elle girilen sınır korunur.
 - Tampermonkey menüsündeki **Koppy Canlı Kontrol**, sık kullanılan modifier, FloatBar konumu ve preview boyutunu küçük bir panelden gerçek davranışa anında uygular. Panel üst sağda açılır, başlığından sürüklenebilir; **sabitle** açıkken sayfada deneme yaparken kapanmaz. Aynı paneldeki **Koppy’yi güncelle** eylemi Tampermonkey güncelleme sayfasını doğrudan açar.
-- Canlı Kontrol’deki varsayılan-kapalı **Görsel Stack**, normal `Cmd+C` sonucunu değiştirmez: her basış macOS panosuna yalnız son PNG’yi yazar. Kısa aralıkta ikinci normal `Cmd+C`, ilk görseli de yakalayan Stack burst’ünü başlatır; sonraki her kopya soğuma çizgisini yeniler. Süre bitince Stack `Hazır N` olarak park edilir ve kuyruk kapanır; aktif burst’te `Esc` yalnız Stack’i iptal eder. En fazla 10 görsel / 150 MB tutulur. Küçük kart kaynaktan imleç-yanı `▣ N` rozete uçar ve rozet imleci takip eder. Rozetin arkasındaki üç küçük kart/dot, fare geçmişine gecikmeli kuyruk yapar. Kopya anında görsel üstünde `+1 Stack · N görsel` çipi görünür; başlıktaki noktalı `Stack N`/`Hazır N` sayacı ve mini `×` bunun kalıcı durumunu taşır. `×` yalnız bu listeyi bırakır, sistem panosuna dokunmaz. Stack, çoklu görüntüyü web panosuna yazma vaadi değildir; sonraki dosya dışa-aktarma akışı için hazırlık katmanıdır.
+- **Son Kopyalar**, normal `Cmd+C` sonucunu değiştirmez: her basış macOS panosuna yalnız son PNG’yi yazar, aynı PNG bu sekmede en fazla 10 görsel / 150 MB sınırında tutulur. İkinci kopyadan sonra mouse yanında `▣ N` rozeti görünür. Mouse ondan uzaklaşınca yumuşak companion takibi yapar; rozete doğru yönelince frenler, sabitlenir ve 44×36 px tıklanabilir hedefe dönüşür. Tıklandığında liste seçilir; çoklu görüntüyü ayrı native pano öğeleri olarak yazmak için hâlâ opt-in Koppy Bridge gerekir. Canlı Kontrol yalnız erişilebilir yedek olarak `Son N` ve `×` gösterir; `×` sistem panosuna dokunmaz.
 - Ayar arayüzü sandbox'lıdır; 91 mevcut Picviewer ayarının saklama sözleşmesini korur.
 - `@updateURL` / `@downloadURL` GitHub'daki sürüm dosyasına bağlıdır. Tampermonkey'de **Automatic installation** açık olmalıdır.
 
 ## Doğrulama
 
-- Unit/DOM: 45 test
-- Browser E2E: 12 test (gerçek PDF.js render, Turkcell-tipi küçük bağlantı ve yerel Picviewer belge önizlemesi dahil)
+- Unit/DOM: 47 test
+- Browser E2E: 13 test (gerçek PDF.js render, Turkcell-tipi küçük bağlantı ve yerel Picviewer belge önizlemesi dahil)
 - Bağımlılık denetimi: `npm audit --audit-level=high`
 
 ## Sıradaki
 
-1. MaxURL'ın Apache-2.0 URL dönüşüm motorundan küçük, fixture'lı ve güvenli bir resolver adaptörü çıkarmak.
-2. Koppy Bridge için opt-in Firefox/Zen companion extension izni ve mimarisini karara bağlamak; cookie/ağ gözlemi yalnız bu katmanda kalacak.
+1. Koppy Bridge için opt-in Firefox/Zen companion extension + yerel macOS helper mimarisini karara bağlamak. Bu katman, rozette seçilen birden fazla PNG'yi macOS panosuna ayrı ayrı yazabilir; cookie/ağ gözlemi yalnız bu katmanda kalacak.
+2. MaxURL'ın Apache-2.0 URL dönüşüm motorundan küçük, fixture'lı ve güvenli bir resolver adaptörü çıkarmak.
 3. Zen + Tampermonkey'de üç gerçek Google Görseliyle canlı clipboard kabulünü tamamlamak.
 
 ## Proje yapısı
@@ -62,4 +62,6 @@
 - 0.4.9: `⌘⌥C` collector kısayolu Türkçe macOS klavye düzeninde `⌥C → ç` karakter dönüşümünden etkilenmez; fiziksel `KeyC` de kabul edilir. Unit testi hem `c` hem `ç`/`KeyC` olayını doğrular.
 - 0.4.10: Cursor collector’ın arkasına üç öğelik gecikmeli kart/dot kuyruğu eklendi. Browser E2E, rozetin imleci takip ettiğini, üç kuyruk öğesinin görünür olduğunu ve farklı geçmiş koordinatlarında kaldığını doğrular.
 - 0.4.11: Zen’le çakışan `⌘⌥C` kaldırıldı. İki hızlı normal `⌘C`, ilk kopyayı da geriye dönük Stack’e alan burst akışını başlatır; her ekleme 2,4 saniyelik soğuma çizgisini yeniler. Soğuyunca `Hazır N` park durumu olur ve kuyruk kapanır. Aktif burst’te `Esc` Stack’i temizler, pano korunur. Browser E2E burst başlangıcını, cooldown parkını, rozet/kuyruk görünümünü ve tek PNG pano sonucunu doğrular.
+- 0.4.12: Zaman baskılı Stack burst/cooldown kaldırıldı. Her normal `Cmd+C` sessiz Son Kopyalar listesine girer. İkinci öğeden sonra `▣ N` rozeti uzaklaşan imleci yumuşak takip eder; imleç rozete yönelince frenleyip sabitlenen, tek tıklanabilir hedefe dönüşür. Unit ve browser E2E normal tek-PNG panoyu, iki öğeli listeyi, magnetic rozetin tıklanmasını ve temizliğin panoya dokunmamasını doğrular.
+- 2026-07-14 araştırması: macOS `NSPasteboard` birden fazla bağımsız öğe yazabilir; ancak web Clipboard API spesifikasyonu `write()` çağrısında son `ClipboardItem`'ı seçer, Firefox extension API'sinde de `additionalItems` yoktur. Bu nedenle sonradan karar verilen çoklu-görsel yapıştırma, Tampermonkey tek başına değil opt-in yerel Koppy Bridge ile gerçekçi ve doğrulanabilir bir yoldur.
 - Tampermonkey kurulum sayfası Zen'de arka planda açıldı. İlk kurulumdan sonra **Automatic installation** açık olmalıdır.

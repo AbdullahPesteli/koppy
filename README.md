@@ -38,19 +38,12 @@ standart `image/png` clipboard biçimine dönüştürür. Kopyalama sırasında 
 bir ilerleme çizgisi, sonunda da çözünürlüklü kısa “Kopyalandı” bilgisi görünür. Metin seçiliyken veya
 input/textarea/contenteditable alanındayken normal kopyalama davranışı korunur.
 
-Birden fazla görseli ayrıca hazırlamak istenirse Canlı Kontrol’deki varsayılan-kapalı **Görsel Stack**
-açılır. Bu mod normal `Cmd+C` davranışını değiştirmez: macOS panosunda her zaman yalnız son PNG bulunur;
-Koppy aynı başarılı PNG’yi geçici Stack’e de ekler. Sayaç en fazla 10 görsel veya 150 MB tutar. `× Temizle`
-yalnız Koppy’nin belleğini serbest bırakır, mevcut sistem clipboard içeriğini silmez. Stack, tarayıcının
-desteklemediği çok-öğeli clipboard yerine ilerideki ayrı-dosya dışa-aktarma akışı için hazırlık alanıdır.
-Stack açık bir kopyada, görselin üzerindeki normal başarı çizgisinin yanında kısa `+1 Stack · N görsel`
-geri bildirimi ve toast içinde `Stack’e eklendi (N)` görünür; böylece aynı görselin listeye alındığı açıkça anlaşılır.
-Hızlı başlangıç için iki görseli kısa arayla normal `⌘C` ile kopyala: ikinci kopya Stack burst’ünü
-başlatır ve iki kart collector’a girer. Sonraki her `⌘C`, imleçteki ince soğuma çizgisini yeniler; süre
-bitince Stack `Hazır N` olarak park edilir ve kuyruk kapanır. Aktif burst’te `Esc`, yalnız Koppy Stack’ini
-iptal eder; sistem panosundaki son kopyaya dokunmaz. Rozet sayfada imleci takip eder, arkasındaki üç küçük
-kart/dot hareket yönüne gecikmeli kuyruk yapar. Rozet gerçek macOS cursor’u değildir, cursor davranışını
-değiştirmeyen sayfa katmanıdır.
+**Son Kopyalar** normal `⌘C` akışını değiştirmez: her başarılı kopya macOS panosuna yine yalnız son PNG'yi
+yazar, ayrıca bu sekmede en fazla 10 görsel / 150 MB olarak tutulur. İkinci görselden itibaren mouse yanında
+küçük `▣ N` rozeti belirir. Mouse ondan uzaklaşınca yumuşakça companion gibi takip eder; rozete doğru
+yönelince frenleyip geniş, tıklanabilir bir hedef olur. Tek tık, son kopyaları seçer. `×` yalnız Koppy'nin
+geçici belleğini temizler, sistem panosuna dokunmaz. Çoklu resmi gerçekten ayrı pano öğeleri olarak yazmak
+tarayıcının değil, ilerideki opt-in Koppy Bridge'in işidir.
 
 Hover yalnız URL adayını çözer; ağ/decode işlemi `Cmd+C` öncesinde başlamaz. Google'da Koppy, Picviewer'ın
 çözdüğü kaynakla birlikte bağlantı parametreleri, güncel metadata, lazy-load alanları, `picture`/`srcset` ve

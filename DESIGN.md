@@ -45,19 +45,13 @@ Koppy, görsel işi sırasında arka planda güvenilir kalan kişisel bir araçt
   %72'sine sığar; kullanıcı ölçü girerse bu sınır aynen uygulanır.
 - `⌘C` sırasında görselin alt kenarında ince, sakin bir ilerleme çizgisi görünür; başarıda kısa süre
   `Kopyalandı · genişlik×yükseklik` metnine dönüşür. Sayfa altındaki toast hata ve erişilebilirlik yedeğidir.
-- Görsel Stack açıksa aynı başarı geri bildiriminin sağında kısa bir `+1 Stack · N görsel` çipi yukarı
-  oturarak görünür; bu, normal panoya kopyalamanın yanında geçici listeye de eklendiğini açıkça ayırır.
-  Canlı Kontrol başlığındaki **Topla** düğmesi açıkken noktalı `Stack N` durumuna döner; N sıfırdan büyükse
-  yanındaki mini `×` yalnız Stack belleğini temizler. Hareketler reduced-motion tercihinde kapalıdır.
-- Kısa sürede yapılan ikinci normal `⌘C`, tekil kopyanın davranışını bozmadan Stack burst’ünü başlatır;
-  iki kart birlikte collector’a girer. Her sonraki `⌘C` soğuma çizgisini yeniler. Başarılı kart, kaynağın
-  merkezinden imlecin yaklaşık 12px sağ-altında beliren `▣ N` rozetine 380ms’de küçülerek gider; rozet
-  Stack açık ve boş değilken imleci takip eder. Soğuma çizgisi bittiğinde Stack `Hazır N` olarak park edilir
-  ve kuyruk kaybolur. Aktif burst’te `Esc` iptal eder ama sistem panosunu değiştirmez. Bu gerçek OS cursor’unu
-  değiştirmez; sayfa üstündeki pointer-events kapalı bir eşlikçi katmandır.
-- Collector rozeti görünürken imlecin konum geçmişinden gelen üç küçük, gittikçe solan kart/dot arkada
-  gecikmeli bir kuyruk oluşturur. Kuyruk hızlı hareketle uzar, imleç durunca yaklaşır; bu işlevsel Stack
-  durumunun tatlı ama sakin hareketidir, reduced-motion tercihinde hiç çizilmez.
+- Son Kopyalar görünmez varsayılandır: normal başarı çizgisi/mesajı liste bilgisi taşımaz. İkinci başarılı
+  kopyadan sonra imleç yanında yalnız `▣ N` rozeti görünür. Rozet, imleç uzaklaşırken hafif gecikmeli takip eder;
+  imleç ona doğru yönelince frenleyip dünya koordinatında sabitlenir, 44×36 px hedefe ve hafif bir halo'ya dönüşür.
+  Böylece hem companion hissi verir hem de kaçan buton olmaz. Tıklama, sonraki Bridge katmanına teslim edilmek
+  üzere listeyi seçer. Reduced-motion'da rozet doğrudan konum değiştirir.
+- Canlı Kontrol yalnız açık olduğunda `Son N` ve `×` gösterir; bu alternatif bir karar paneli değil, aynı
+  rozetin erişilebilir yedeğidir. `×` yalnız geçici belleği temizler ve sistem panosunu değiştirmez.
 - Tampermonkey menüsünden açılan **Canlı Kontrol**, tam ayar penceresinin yerine geçen ikinci bir form değildir:
   yalnız önizleme tuşu, FloatBar konumu ve preview boyutu için küçük, sayfaya ilişen bir kontrol yüzeyidir.
   Seçim gerçek `prefs` değerine kullanıcı tıklamasıyla anında yazılır; açık FloatBar/preview varsa değişiklik

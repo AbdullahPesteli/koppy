@@ -71,7 +71,7 @@ const replacements = new Map([
     ["// @name:pt-BR           Picviewer CE+", "// @name:pt-BR           Koppy"],
     ["// @name:ru              Picviewer CE+", "// @name:ru              Koppy"],
     ["// @author               NLF && ywzhaiqi && hoothin", "// @author               NLF && ywzhaiqi && hoothin; Koppy fork by pestly"],
-    ["// @version              2026.2.6.1", "// @version              0.4.11"],
+    ["// @version              2026.2.6.1", "// @version              0.4.12"],
     ["// @namespace            https://github.com/hoothin/UserScripts", "// @namespace            https://github.com/AbdullahPesteli/koppy"],
     ["// @homepage             https://pv.hoothin.com/", "// @homepage             https://github.com/AbdullahPesteli/koppy"],
     ["// @supportURL           https://github.com/hoothin/UserScripts/issues", "// @supportURL           https://github.com/AbdullahPesteli/koppy/issues"],
@@ -292,8 +292,8 @@ const controlDeckIntegration = `        const koppyOpenUpdate = () => _GM_openIn
             openFullSettings: () => globalThis.KoppySettingsUI.openSecure(),
             openUpdate: koppyOpenUpdate,
             getStackState: () => globalThis.KoppyCopyController.getStackState(),
-            setStackEnabled: enabled => globalThis.KoppyCopyController.setStackEnabled(enabled),
             clearStack: () => globalThis.KoppyCopyController.clearStack(),
+            acceptRecentCopies: () => globalThis.KoppyCopyController.acceptRecentCopies(),
             onStackChange: listener => globalThis.KoppyCopyController.onStackChange(listener),
         });
         if (koppyControlDeck) _GM_registerMenuCommand("Koppy Canlı Kontrol", () => koppyControlDeck.toggle());
