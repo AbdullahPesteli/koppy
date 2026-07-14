@@ -1,6 +1,6 @@
 # Koppy — Durum
 
-**Sürüm:** 0.4.8
+**Sürüm:** 0.4.9
 **Lisans:** MIT
 **Dağıtım:** `dist/Koppy.user.js` üzerinden Tampermonkey
 
@@ -59,4 +59,5 @@
 - 0.4.6: Varsayılan kapalı Görsel Stack eklendi. Normal `Cmd+C` her seferinde tek güncel PNG clipboard öğesi olarak korundu; Stack açıkken aynı PNG geçici belleğe de ekleniyor. Canlı Kontrol’den aç/kapat, sayaç ve yalnız Koppy belleğini temizleyen `× Temizle` sunuluyor. 10 öğe / 150 MB üst sınırı sessiz bellek birikimini engelliyor. Unit + browser E2E, iki Stack kopyasında sistem panosunun tek PNG kaldığını ve Stack temizliğinin panoyu değiştirmediğini doğruluyor.
 - 0.4.7: Stack’in görünür geri bildirimi güçlendirildi. Kopya çizgisi yanında animasyonlu `+1 Stack · N görsel` çipi, toast’ta açık “Stack’e eklendi” metni ve Canlı Kontrol başlığında noktalı aktif sayaç var. Stack, teknik olarak açık olsa da görünmez kalan bir mod olmaktan çıktı; browser E2E bu görünür sayacı doğruluyor.
 - 0.4.8: Hızlı collector hareketi eklendi. `⌘⌥C` ilk görseli normal panoya da kopyalayarak Stack’i etkinleştirir; kart 380ms’de kaynaktan imleç-yanı `▣ N` sayacına uçar. Sayaç Stack açıkken imleci takip eder. Browser E2E, gerçek `Meta+Alt+C` tuş olayını, ikinci normal `Meta+C` kopyasını, tek PNG clipboard sonucunu ve rozetin fare koordinatını takip ettiğini doğrular.
+- 0.4.9: `⌘⌥C` collector kısayolu Türkçe macOS klavye düzeninde `⌥C → ç` karakter dönüşümünden etkilenmez; fiziksel `KeyC` de kabul edilir. Unit testi hem `c` hem `ç`/`KeyC` olayını doğrular.
 - Tampermonkey kurulum sayfası Zen'de arka planda açıldı. İlk kurulumdan sonra **Automatic installation** açık olmalıdır.

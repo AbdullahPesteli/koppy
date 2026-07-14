@@ -819,7 +819,10 @@
         if (!event || event.repeat || (!allowAlt && event.altKey) || event.shiftKey) return false;
         const platform = windowLike && windowLike.navigator && (windowLike.navigator.userAgentData && windowLike.navigator.userAgentData.platform || windowLike.navigator.platform || "");
         const modifier = /mac/i.test(String(platform)) ? event.metaKey : (event.metaKey || event.ctrlKey);
-        if (!modifier || String(event.key || "").toLowerCase() !== "c") return false;
+        // On a Turkish macOS layout ⌥C can report `key: "ç"`; the physical
+        // key stays KeyC. Accept both so the collector shortcut is layout-safe.
+        const isC = String(event.key || "").toLowerCase() === "c" || String(event.code || "") === "KeyC";
+        if (!modifier || !isC) return false;
         if (isEditableTarget(event.target)) return false;
         const selection = windowLike && typeof windowLike.getSelection === "function" ? windowLike.getSelection() : null;
         return !(selection && String(selection).trim());

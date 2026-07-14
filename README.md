@@ -46,7 +46,8 @@ desteklemediği çok-öğeli clipboard yerine ilerideki ayrı-dosya dışa-aktar
 Stack açık bir kopyada, görselin üzerindeki normal başarı çizgisinin yanında kısa `+1 Stack · N görsel`
 geri bildirimi ve toast içinde `Stack’e eklendi (N)` görünür; böylece aynı görselin listeye alındığı açıkça anlaşılır.
 Hızlı başlangıç için görsel üzerindeyken `⌘⌥C` bas: normal PNG kopyası yapılır, Stack açılır ve küçük kart
-imlecin yanındaki `▣ 1` rozetine uçar. Sonraki normal `⌘C` kopyaları sayıyı artırır; rozet sayfada imleci
+imlecin yanındaki `▣ 1` rozetine uçar. Kısayol Türkçe macOS klavyesinde de karaktere değil fiziksel C
+tuşuna bağlıdır. Sonraki normal `⌘C` kopyaları sayıyı artırır; rozet sayfada imleci
 takip eder. Rozet gerçek macOS cursor’u değildir, cursor davranışını değiştirmeyen sayfa katmanıdır.
 
 Hover yalnız URL adayını çözer; ağ/decode işlemi `Cmd+C` öncesinde başlamaz. Google'da Koppy, Picviewer'ın
