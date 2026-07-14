@@ -814,8 +814,9 @@
         return Boolean(target.closest && target.closest("[contenteditable='true'], input, textarea, select"));
     }
 
-    function isCopyGesture(event, windowLike) {
-        if (!event || event.repeat || event.altKey || event.shiftKey) return false;
+    function isCopyGesture(event, windowLike, options) {
+        const allowAlt = Boolean(options && options.allowAlt);
+        if (!event || event.repeat || (!allowAlt && event.altKey) || event.shiftKey) return false;
         const platform = windowLike && windowLike.navigator && (windowLike.navigator.userAgentData && windowLike.navigator.userAgentData.platform || windowLike.navigator.platform || "");
         const modifier = /mac/i.test(String(platform)) ? event.metaKey : (event.metaKey || event.ctrlKey);
         if (!modifier || String(event.key || "").toLowerCase() !== "c") return false;
@@ -1063,6 +1064,102 @@
         };
     }
 
+    function createStackCursorCollector(documentLike, windowLike) {
+        const doc = documentLike;
+        const win = windowLike || (doc && doc.defaultView);
+        let root;
+
+        function reducedMotion() {
+            return Boolean(win && typeof win.matchMedia === "function" && win.matchMedia("(prefers-reduced-motion: reduce)").matches);
+        }
+
+        function ensure() {
+            if (root || !doc || !doc.documentElement) return root;
+            root = doc.createElement("div");
+            root.id = "koppy-stack-cursor";
+            root.setAttribute("aria-hidden", "true");
+            Object.assign(root.style, {
+                position: "fixed", display: "none", left: "0", top: "0", zIndex: "2147483647", pointerEvents: "none",
+                padding: "4px 7px", borderRadius: "999px", border: "1px solid rgba(124,156,255,.72)",
+                color: "#eff3ff", background: "rgba(38,53,87,.94)", boxShadow: "0 5px 16px rgba(0,0,0,.25)",
+                font: "700 11px/1 -apple-system, BlinkMacSystemFont, sans-serif", whiteSpace: "nowrap",
+                transform: "translate(12px, 12px) scale(.92)", opacity: "0", transition: "opacity 160ms ease, transform 160ms ease",
+            });
+            doc.documentElement.appendChild(root);
+            return root;
+        }
+
+        function place(pointer) {
+            const item = ensure();
+            if (!item || !pointer) return null;
+            item.style.left = Math.round(Number(pointer.x) || 0) + "px";
+            item.style.top = Math.round(Number(pointer.y) || 0) + "px";
+            return item;
+        }
+
+        function show(pointer, count) {
+            const item = place(pointer);
+            if (!item || !count) return;
+            item.textContent = "▣ " + count;
+            item.style.display = "block";
+            item.style.opacity = "1";
+            item.style.transform = "translate(12px, 12px) scale(1)";
+        }
+
+        function hide() {
+            if (!root) return;
+            root.style.display = "none";
+            root.style.opacity = "0";
+        }
+
+        function collect(source, pointer, count) {
+            if (!pointer || !count) return;
+            const target = place(pointer);
+            if (!target) return;
+            const rect = source && typeof source.getBoundingClientRect === "function" ? source.getBoundingClientRect() : null;
+            if (!rect || !rect.width || !rect.height || reducedMotion()) {
+                show(pointer, count);
+                return;
+            }
+            const ghost = doc.createElement("div");
+            ghost.textContent = "▣";
+            const startX = rect.left + rect.width / 2;
+            const startY = rect.top + rect.height / 2;
+            const endX = Number(pointer.x) + 16;
+            const endY = Number(pointer.y) + 16;
+            Object.assign(ghost.style, {
+                position: "fixed", left: Math.round(startX) + "px", top: Math.round(startY) + "px", zIndex: "2147483647", pointerEvents: "none",
+                width: "22px", height: "18px", display: "grid", placeItems: "center", borderRadius: "5px",
+                border: "1px solid rgba(124,156,255,.84)", color: "#dbe5ff", background: "rgba(38,53,87,.94)",
+                boxShadow: "0 4px 12px rgba(0,0,0,.22)", font: "700 11px/1 -apple-system, BlinkMacSystemFont, sans-serif",
+                transform: "translate(-50%, -50%) scale(1)", opacity: "1", transition: "transform 380ms cubic-bezier(.2,.8,.2,1), opacity 380ms ease",
+            });
+            doc.documentElement.appendChild(ghost);
+            const dx = endX - startX;
+            const dy = endY - startY;
+            const fly = () => {
+                ghost.style.transform = "translate(calc(-50% + " + Math.round(dx) + "px), calc(-50% + " + Math.round(dy) + "px)) scale(.38)";
+                ghost.style.opacity = "0";
+            };
+            if (win && typeof win.requestAnimationFrame === "function") win.requestAnimationFrame(fly);
+            else setTimeout(fly, 0);
+            setTimeout(() => {
+                if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
+                show(pointer, count);
+            }, 390);
+        }
+
+        return {
+            collect,
+            hide,
+            move(pointer, state) {
+                if (!root || root.style.display === "none") return;
+                if (!state || !state.enabled || !state.count) return hide();
+                show(pointer, state.count);
+            },
+        };
+    }
+
     async function prepareClipboardImage(candidate, options) {
         const settings = options || {};
         if (!candidate || !candidate.url) throw new Error("Orijinal görsel adresi bulunamadı");
@@ -1112,6 +1209,7 @@
         let documentPreview = null;
         let lastPointer = null;
         let started = false;
+        const stackCursor = createStackCursorCollector(documentLike, windowLike);
         const stack = {
             enabled: Boolean(deps.stackEnabled),
             items: [],
@@ -1139,7 +1237,9 @@
 
         function setStackEnabled(enabled) {
             stack.enabled = Boolean(enabled);
-            return emitStackChange();
+            const state = emitStackChange();
+            if (!state.enabled || !state.count) stackCursor.hide();
+            return state;
         }
 
         function clearStack() {
@@ -1148,6 +1248,7 @@
             // existing clipboard untouched.
             stack.items = [];
             stack.bytes = 0;
+            stackCursor.hide();
             return emitStackChange();
         }
 
@@ -1422,6 +1523,7 @@
 
         function onPointerMove(event) {
             lastPointer = { x: event.clientX, y: event.clientY };
+            stackCursor.move(lastPointer, stackState());
             const image = imageAtPointer(event);
             if (image) {
                 setHoveredImage(image, false);
@@ -1457,7 +1559,8 @@
         }
 
         async function copyHoveredImage(event) {
-            if (!isCopyGesture(event, windowLike)) {
+            const stackShortcut = Boolean(event && event.altKey);
+            if (!isCopyGesture(event, windowLike, { allowAlt: stackShortcut })) {
                 return { status: "not-applicable" };
             }
             // Google can replace or move a result without another pointer event. Re-read the
@@ -1496,6 +1599,7 @@
                 element: stateAtCopy.element,
                 candidates: stateAtCopy.candidates.slice(),
                 candidate: stateAtCopy.candidate,
+                stackShortcut,
                 activeRequest: null,
                 cancelled: false,
             };
@@ -1510,8 +1614,13 @@
                     new ClipboardItemCtor({ "image/png": clipboardBlobPromise }),
                 ]));
                 const [prepared] = await Promise.all([preparedPromise, writePromise]);
+                // ⌘⌥C is the quick “start collecting here” gesture. It performs
+                // the same real clipboard copy first, then leaves Stack active for
+                // subsequent ordinary ⌘C presses.
+                if (copyState.stackShortcut && !stack.enabled) setStackEnabled(true);
                 const stacked = addToStack(prepared);
                 feedback.complete(copyState.element, prepared.width, prepared.height, prepared.isThumbnailFallback, stacked);
+                if (stacked.added) stackCursor.collect(copyState.element, lastPointer, stacked.state.count);
                 let message = (prepared.isThumbnailFallback ? "Önizleme kopyalandı: " : "Kopyalandı: ") + prepared.width + "×" + prepared.height;
                 if (stacked.added) message += " · Stack’e eklendi (" + stacked.state.count + ")";
                 else if (stack.enabled && stacked.reason === "item-limit") message += " · Stack dolu (" + MAX_STACK_ITEMS + ")";
@@ -1524,6 +1633,7 @@
                     source: prepared.source,
                     isThumbnailFallback: prepared.isThumbnailFallback,
                     stacked: stacked.added,
+                    stackStarted: copyState.stackShortcut,
                     stack: stacked.state,
                 };
             } catch (error) {

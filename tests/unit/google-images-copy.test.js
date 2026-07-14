@@ -712,6 +712,7 @@ test("copy guards cover textarea, contenteditable, repeat/modifiers, macOS Ctrl+
         { ...base, shiftKey: true },
         { ...base, altKey: true },
     ]) assert.equal(Koppy.isCopyGesture(event, dom.window), false);
+    assert.equal(Koppy.isCopyGesture({ ...base, altKey: true }, dom.window, { allowAlt: true }), true);
 
     const macWindow = { navigator: { platform: "MacIntel" }, getSelection: () => null };
     assert.equal(Koppy.isCopyGesture({ key: "c", ctrlKey: true, target: document.body }, macWindow), false);

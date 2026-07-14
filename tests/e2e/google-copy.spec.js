@@ -160,19 +160,20 @@ test("Stack mode keeps the regular clipboard as one current PNG while retaining 
             requestImage: () => ({ promise: Promise.resolve({ blob: png }), abort() {} }),
             normalizeImage: async blob => ({ blob, width: 320, height: 180 }),
         });
-        window.__stackController.setStackEnabled(true);
-        window.__stackController.setHoveredImage(image);
-        const event = { key: "c", metaKey: true, target: document.body, preventDefault() {}, stopImmediatePropagation() {} };
-        window.__stackFirst = await window.__stackController.copyHoveredImage(event);
-        window.__stackSecond = await window.__stackController.copyHoveredImage(event);
+        window.__stackController.start();
     });
+    await page.hover("#image");
+    await page.keyboard.press("Meta+Alt+C");
+    await expect.poll(() => page.evaluate(() => window.__stackController.getStackState().count)).toBe(1);
+    await page.keyboard.press("Meta+C");
+    await expect.poll(() => page.evaluate(() => window.__stackController.getStackState().count)).toBe(2);
+    await page.waitForTimeout(450);
 
     const result = await page.evaluate(async () => {
         const items = await navigator.clipboard.read();
         const blob = await items[0].getType("image/png");
         const bitmap = await createImageBitmap(blob);
         const value = {
-            copies: [window.__stackFirst, window.__stackSecond].map(item => ({ status: item.status, stacked: item.stacked, count: item.stack.count })),
             clipboardItemCount: items.length,
             clipboardTypes: items[0].types,
             width: bitmap.width,
@@ -180,22 +181,27 @@ test("Stack mode keeps the regular clipboard as one current PNG while retaining 
             stack: window.__stackController.getStackState(),
             feedback: document.querySelector("#koppy-copy-feedback").textContent,
             stackChip: document.querySelector(".koppy-copy-feedback-stack").textContent,
+            collector: document.querySelector("#koppy-stack-cursor").textContent,
         };
         bitmap.close();
         return value;
     });
-    expect(result.copies).toEqual([
-        { status: "copied", stacked: true, count: 1 },
-        { status: "copied", stacked: true, count: 2 },
-    ]);
     expect(result.clipboardItemCount).toBe(1);
     expect(result.clipboardTypes).toEqual(["image/png"]);
     expect([result.width, result.height]).toEqual([320, 180]);
     expect(result.stack.count).toBe(2);
+    expect(result.stack.enabled).toBe(true);
     expect(result.feedback).toContain("Kopyalandı · 320×180");
     expect(result.stackChip).toBe("+1 Stack · 2 görsel");
+    expect(result.collector).toBe("▣ 2");
     fs.mkdirSync(path.resolve("test-results"), { recursive: true });
     await page.screenshot({ path: "test-results/koppy-stack-feedback.png" });
+    await page.mouse.move(500, 300);
+    const collectorPosition = await page.evaluate(() => {
+        const collector = document.querySelector("#koppy-stack-cursor");
+        return { left: collector.style.left, top: collector.style.top, display: collector.style.display };
+    });
+    expect(collectorPosition).toEqual({ left: "500px", top: "300px", display: "block" });
 
     const cleared = await page.evaluate(() => window.__stackController.clearStack());
     expect(cleared).toMatchObject({ enabled: true, count: 0, bytes: 0 });

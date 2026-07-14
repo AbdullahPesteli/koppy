@@ -60,7 +60,7 @@
         let status;
         let isOpen = false;
         let closeTimer;
-        let statusMessage = "Hazır · bir görselin üzerinde dene";
+        let statusMessage = "⌘⌥C Stack başlatır · ⌘C normal kopyalar";
         let statusError = false;
         let isPinned = false;
         let drag;
@@ -134,7 +134,7 @@
                     : "Görsel Stack kapalı");
                 stackToggle.title = stackState.enabled
                     ? "Stack açık: Cmd+C normal panoya ve geçici listeye ekler"
-                    : "Stack kapalı: Cmd+C yalnız normal panoya kopyalar";
+                    : "⌘⌥C ile Stack başlat; normal Cmd+C yalnız panoya kopyalar";
                 stackToggle.addEventListener("click", event => {
                     if (!isUserEvent(event)) return;
                     const next = settings.setStackEnabled(!stackState.enabled) || stackState;

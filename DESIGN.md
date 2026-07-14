@@ -49,6 +49,10 @@ Koppy, görsel işi sırasında arka planda güvenilir kalan kişisel bir araçt
   oturarak görünür; bu, normal panoya kopyalamanın yanında geçici listeye de eklendiğini açıkça ayırır.
   Canlı Kontrol başlığındaki **Topla** düğmesi açıkken noktalı `Stack N` durumuna döner; N sıfırdan büyükse
   yanındaki mini `×` yalnız Stack belleğini temizler. Hareketler reduced-motion tercihinde kapalıdır.
+- Görsel üzerinde `⌘⌥C`, normal PNG kopyasını yaptıktan sonra Stack’i de başlatan hızlı collector
+  kısayoludur. Başarılı kart, kaynağın merkezinden imlecin yaklaşık 12px sağ-altında beliren `▣ N`
+  rozetine 380ms’de küçülerek gider; rozet Stack açık ve boş değilken imleci takip eder. Bu gerçek OS
+  cursor’unu değiştirmez; sayfa üstündeki pointer-events kapalı bir eşlikçi katmandır.
 - Tampermonkey menüsünden açılan **Canlı Kontrol**, tam ayar penceresinin yerine geçen ikinci bir form değildir:
   yalnız önizleme tuşu, FloatBar konumu ve preview boyutu için küçük, sayfaya ilişen bir kontrol yüzeyidir.
   Seçim gerçek `prefs` değerine kullanıcı tıklamasıyla anında yazılır; açık FloatBar/preview varsa değişiklik
