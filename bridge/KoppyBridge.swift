@@ -12,7 +12,11 @@ private let maxBytes = 150 * 1024 * 1024
 private let headerLimit = 16 * 1024
 private let frameContentType = "application/vnd.koppy.images+binary"
 private let clientHeader = "tampermonkey-v1"
-private let bridgeVersion = "0.5.0"
+private let bridgeVersion = "0.5.3"
+private var bridgeRequestCount = 0
+private var lastBridgePath = "none"
+private var lastBridgeStatus = 0
+private var lastBridgeEventAt = "never"
 
 private struct Request {
     let method: String
@@ -43,6 +47,51 @@ private func applicationDirectory() throws -> URL {
     try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
     try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: url.path)
     return url
+}
+
+// Diagnostics are local, bounded and redacted. In particular, this file never
+// contains image bytes, raw URLs, HTTP headers, pairing tokens or clipboard
+// data. It exists so a later Koppy repair can distinguish “browser never
+// reached Bridge” from “Bridge received but rejected/wrote the request”.
+private func recordDiagnostic(_ event: String, fields: [String: Any] = [:]) {
+    guard let directory = try? applicationDirectory() else { return }
+    let file = directory.appendingPathComponent("diagnostics.ndjson", isDirectory: false)
+    var payload = fields
+    let timestamp = ISO8601DateFormatter().string(from: Date())
+    payload["event"] = event
+    payload["at"] = timestamp
+    guard let line = try? JSONSerialization.data(withJSONObject: payload, options: []), line.count < 2048 else { return }
+    lastBridgeEventAt = timestamp
+    if let values = try? FileManager.default.attributesOfItem(atPath: file.path),
+       let size = values[.size] as? NSNumber, size.intValue >= 128 * 1024 {
+        try? FileManager.default.removeItem(at: file)
+    }
+    if !FileManager.default.fileExists(atPath: file.path) {
+        FileManager.default.createFile(atPath: file.path, contents: nil, attributes: [.posixPermissions: 0o600])
+    }
+    guard let handle = FileHandle(forWritingAtPath: file.path) else { return }
+    defer { try? handle.close() }
+    handle.seekToEndOfFile()
+    handle.write(line)
+    handle.write(Data("\n".utf8))
+    try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
+}
+
+private func recentDiagnostics() -> [[String: Any]] {
+    guard let directory = try? applicationDirectory(),
+          let content = try? String(contentsOf: directory.appendingPathComponent("diagnostics.ndjson"), encoding: .utf8) else { return [] }
+    return content.split(separator: "\n").suffix(32).compactMap { line in
+        guard let data = String(line).data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        return object
+    }
+}
+
+private func requestResult(_ request: Request, status: Int, imageCount: Int? = nil) {
+    lastBridgeStatus = status
+    var fields: [String: Any] = ["route": request.path, "method": request.method, "status": status]
+    if let imageCount { fields["imageCount"] = imageCount }
+    recordDiagnostic(status >= 200 && status < 300 ? "bridge_request_ok" : "bridge_request_failed", fields: fields)
 }
 
 private func loadOrCreateToken() throws -> String {
@@ -183,22 +232,44 @@ private func writeToClipboard(_ images: [Data]) throws {
 }
 
 private func handle(_ fd: Int32, token: String) {
+    var activeRequest: Request?
     do {
         let request = try readRequest(fd)
+        activeRequest = request
         if request.method == "GET", request.path == "/v1/health" {
-            response(fd, status: 200, payload: ["ok": true, "version": bridgeVersion])
+            recordDiagnostic("bridge_health", fields: ["route": "health", "status": 200])
+            response(fd, status: 200, payload: [
+                "ok": true,
+                "version": bridgeVersion,
+                "bridgeRequestCount": bridgeRequestCount,
+                "lastBridgePath": lastBridgePath,
+                "lastBridgeStatus": lastBridgeStatus,
+                "lastBridgeEventAt": lastBridgeEventAt,
+            ])
             return
         }
+        bridgeRequestCount += 1
+        lastBridgePath = request.path
         if request.method == "GET", request.path == "/v1/token" {
             guard request.headers["x-koppy-client"] == clientHeader else { throw BridgeError.unauthorized }
+            requestResult(request, status: 200)
             response(fd, status: 200, payload: ["ok": true, "token": token])
             return
         }
+        if request.method == "GET", request.path == "/v1/diagnostics" {
+            let auth = request.headers["authorization"] ?? ""
+            guard auth.hasPrefix("Bearer "), constantTimeEqual(String(auth.dropFirst(7)), token) else { throw BridgeError.unauthorized }
+            requestResult(request, status: 200)
+            response(fd, status: 200, payload: ["ok": true, "events": recentDiagnostics()])
+            return
+        }
         guard request.method == "POST", request.path == "/v1/images" else {
+            requestResult(request, status: 404)
             response(fd, status: 404, payload: ["ok": false, "error": "bulunamadı"])
             return
         }
         guard request.headers["content-type"]?.lowercased() == frameContentType else {
+            requestResult(request, status: 415)
             response(fd, status: 415, payload: ["ok": false, "error": "geçersiz içerik türü"])
             return
         }
@@ -206,6 +277,7 @@ private func handle(_ fd: Int32, token: String) {
         guard auth.hasPrefix("Bearer "), constantTimeEqual(String(auth.dropFirst(7)), token) else { throw BridgeError.unauthorized }
         let images = try parseImages(request.body)
         try writeToClipboard(images)
+        requestResult(request, status: 200, imageCount: images.count)
         response(fd, status: 200, payload: ["ok": true, "count": images.count])
     } catch let bridgeError as BridgeError {
         let code: Int
@@ -214,8 +286,12 @@ private func handle(_ fd: Int32, token: String) {
         case .tooLarge: code = 413
         default: code = 400
         }
+        if let request = activeRequest { requestResult(request, status: code) }
+        else { lastBridgeStatus = code; recordDiagnostic("bridge_request_failed", fields: ["route": lastBridgePath, "status": code]) }
         response(fd, status: code, payload: ["ok": false, "error": bridgeError.localizedDescription])
     } catch {
+        lastBridgeStatus = 500
+        recordDiagnostic("bridge_request_failed", fields: ["route": lastBridgePath, "status": 500])
         response(fd, status: 500, payload: ["ok": false, "error": "beklenmeyen yerel hata"])
     }
 }

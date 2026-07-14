@@ -1287,6 +1287,18 @@
 
     function createController(dependencies) {
         const deps = dependencies || {};
+        const diagnostics = deps.diagnostics || (typeof globalThis !== "undefined" && globalThis.KoppyDiagnostics);
+        function diagnostic(event, fields) {
+            if (diagnostics && typeof diagnostics.record === "function") diagnostics.record(event, fields);
+        }
+        function errorKind(cause) {
+            const message = String(cause && cause.message || "").toLowerCase();
+            if (/iptal|abort|cancel/.test(message)) return "cancelled";
+            if (/zaman|timeout/.test(message)) return "timeout";
+            if (/http|403|404|yanıt/.test(message)) return "response";
+            if (/görsel|png|decode|format|mime|belge/.test(message)) return "decode";
+            return "unknown";
+        }
         const documentLike = deps.document;
         const windowLike = deps.window || (documentLike && documentLike.defaultView);
         const locationLike = deps.location || (windowLike && windowLike.location);
@@ -1363,6 +1375,7 @@
             stack.accepted = false;
             stack.delivering = false;
             stackCursor.hide();
+            diagnostic("stack_cleared", { imageCount: 0, totalBytes: 0 });
             return emitStackChange();
         }
 
@@ -1389,13 +1402,16 @@
             stack.bytes += bytes;
             stack.accepted = false;
             stack.delivering = false;
+            diagnostic("stack_added", { imageCount: stack.items.length, totalBytes: stack.bytes, width: prepared.width, height: prepared.height, candidateSource: prepared.source || "unknown" });
             return { added: true, evicted, state: emitStackChange() };
         }
 
         function acceptStack() {
             if (stack.items.length < 2) return stackState();
+            diagnostic("stack_delivery_start", { imageCount: stack.items.length, totalBytes: stack.bytes });
             stackCursor.capture();
             if (typeof deps.onRecentCopiesAccepted !== "function") {
+                diagnostic("stack_delivery_failed", { imageCount: stack.items.length, errorKind: "bridge-missing", errorCode: "bridge-unavailable" });
                 notify("Koppy Bridge: yerel pano yardımcısı kurulu değil", "error");
                 return stackState();
             }
@@ -1403,6 +1419,7 @@
             try {
                 output = deps.onRecentCopiesAccepted(stack.items.slice(), stackState());
             } catch (cause) {
+                diagnostic("stack_delivery_failed", { imageCount: stack.items.length, errorKind: errorKind(cause) });
                 const message = cause && cause.message || "çoklu pano yazımı başlatılamadı";
                 notify("Koppy: " + message, "error");
                 return stackState();
@@ -1412,6 +1429,7 @@
                 stack.delivering = false;
                 const state = emitStackChange();
                 notify(state.count + " görsel panoda · tek ⌘V ile yapıştır", "success");
+                diagnostic("stack_delivery_complete", { imageCount: state.count, totalBytes: stack.bytes });
                 return state;
             }
             stack.accepted = false;
@@ -1424,6 +1442,7 @@
                 const state = emitStackChange();
                 const count = Number(result && result.count) || state.count;
                 notify(count + " görsel panoda · tek ⌘V ile yapıştır", "success");
+                diagnostic("stack_delivery_complete", { imageCount: count, totalBytes: stack.bytes });
                 return state;
             }).catch(cause => {
                 stack.delivering = false;
@@ -1431,6 +1450,7 @@
                 const state = emitStackChange();
                 const message = cause && cause.message || "çoklu pano yazılamadı";
                 notify("Koppy: " + message, "error");
+                diagnostic("stack_delivery_failed", { imageCount: stack.items.length, totalBytes: stack.bytes, errorKind: errorKind(cause) });
                 return Object.assign({ failed: true, error: message }, state);
             });
         }
@@ -1610,6 +1630,7 @@
                 copying: false,
                 isGoogleResult: isGoogleImagesLocation(locationLike) && isGoogleResultImage(image),
             };
+            diagnostic("candidate_resolved", { imageCount: candidates.length, candidateSource: candidates[0] && candidates[0].source || "none", candidateKind: current.isGoogleResult ? "google" : "page" });
         }
 
         function pointerInsideCurrent() {
@@ -1698,6 +1719,7 @@
             for (const candidate of state.candidates) {
                 if (state.cancelled) throw new Error("Görsel hazırlama iptal edildi");
                 try {
+                    diagnostic("candidate_attempt", { candidateSource: candidate.source || "unknown", candidateKind: candidate.isThumbnailFallback ? "thumbnail" : "primary" });
                     const request = requestImage(candidate.url, progress => {
                         if (!progress || !progress.lengthComputable || !progress.total) return;
                         feedback.progress(state.element, Number(progress.loaded || 0) / Number(progress.total));
@@ -1709,10 +1731,12 @@
                     feedback.decoding(state.element);
                     const prepared = await normalizeImage(downloaded.blob);
                     if (state.cancelled) throw new Error("Görsel hazırlama iptal edildi");
+                    diagnostic("candidate_prepared", { candidateSource: candidate.source || "unknown", mime: downloaded.blob && downloaded.blob.type || "unknown", width: prepared.width, height: prepared.height, totalBytes: prepared.blob && prepared.blob.size || 0 });
                     return Object.assign({ source: candidate.source, isThumbnailFallback: Boolean(candidate.isThumbnailFallback) }, prepared);
                 } catch (error) {
                     state.activeRequest = null;
                     if (state.cancelled) throw error;
+                    diagnostic("candidate_failed", { candidateSource: candidate.source || "unknown", errorKind: errorKind(error) });
                     lastError = error;
                 }
             }
@@ -1723,6 +1747,7 @@
             if (!isCopyGesture(event, windowLike)) {
                 return { status: "not-applicable" };
             }
+            const copyFlowId = diagnostics && typeof diagnostics.flowId === "function" ? diagnostics.flowId() : "copy";
             // Google can replace or move a result without another pointer event. Re-read the
             // element below the pointer at the instant of Cmd+C, so a stale hover never falls
             // through to a browser/upstream URL copy.
@@ -1734,6 +1759,7 @@
                 if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
                 else if (typeof event.stopPropagation === "function") event.stopPropagation();
                 notify("Koppy: Görsel zaten hazırlanıyor…", "progress");
+                diagnostic("copy_failed", { flowId: copyFlowId, errorKind: "busy", errorCode: "copy-in-progress" });
                 return { status: "failed", reason: "copy-in-progress" };
             }
             setHoveredImage(current.element, true);
@@ -1743,6 +1769,7 @@
                 if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
                 else if (typeof event.stopPropagation === "function") event.stopPropagation();
                 notify("Koppy: Orijinal görsel adresi bulunamadı", "error");
+                diagnostic("copy_failed", { flowId: copyFlowId, errorKind: "candidate", errorCode: "candidate-not-found" });
                 return { status: "failed", reason: "candidate-not-found" };
             }
 
@@ -1752,6 +1779,7 @@
 
             if (!navigatorLike || !navigatorLike.clipboard || typeof navigatorLike.clipboard.write !== "function" || !ClipboardItemCtor) {
                 notify("Koppy: Tarayıcı resim panosunu desteklemiyor", "error");
+                diagnostic("copy_failed", { flowId: copyFlowId, errorKind: "clipboard", errorCode: "clipboard-unavailable" });
                 return { status: "failed", reason: "clipboard-unavailable" };
             }
             const stateAtCopy = current;
@@ -1763,6 +1791,7 @@
                 cancelled: false,
             };
             activeCopy = copyState;
+            diagnostic("copy_start", { flowId: copyFlowId, imageCount: copyState.candidates.length, candidateSource: copyState.candidate && copyState.candidate.source || "unknown" });
             feedback.start(copyState.element);
             notify("Koppy: Görsel hazırlanıyor…", "progress");
             const preparedPromise = prepareFromCandidates(copyState);
@@ -1781,6 +1810,7 @@
                 let message = (prepared.isThumbnailFallback ? "Önizleme kopyalandı: " : "Kopyalandı: ") + prepared.width + "×" + prepared.height;
                 if (stacked.reason === "byte-limit") message += " · Son Kopyalar'a sığmadı";
                 notify(message, stacked.reason ? "progress" : "success");
+                diagnostic("copy_complete", { flowId: copyFlowId, width: prepared.width, height: prepared.height, totalBytes: prepared.blob && prepared.blob.size || 0, candidateSource: prepared.source || "unknown" });
                 return {
                     status: "copied",
                     width: prepared.width,
@@ -1796,6 +1826,7 @@
                 const message = error && error.message ? error.message : "Bilinmeyen hata";
                 feedback.fail(copyState.element, "Kopyalanamadı");
                 notify("Koppy: " + message, "error");
+                diagnostic("copy_failed", { flowId: copyFlowId, errorKind: errorKind(error) });
                 return { status: "failed", reason: message };
             } finally {
                 copyState.activeRequest = null;
@@ -1853,6 +1884,7 @@
             getStackState: stackState,
             clearStack,
             acceptRecentCopies: acceptStack,
+            getDiagnostics() { return diagnostics && typeof diagnostics.snapshot === "function" ? diagnostics.snapshot() : null; },
             onStackChange(listener) {
                 if (typeof listener !== "function") return () => {};
                 stack.listeners.add(listener);

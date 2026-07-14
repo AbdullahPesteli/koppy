@@ -1,6 +1,6 @@
 # Koppy — Durum
 
-**Sürüm:** 0.5.2
+**Sürüm:** 0.5.3
 **Lisans:** MIT
 **Dağıtım:** `dist/Koppy.user.js` üzerinden Tampermonkey
 
@@ -15,6 +15,7 @@
 - **Son Kopyalar**, normal `Cmd+C` sonucunu değiştirmez: her basış macOS panosuna yalnız son PNG’yi yazar, aynı PNG bu sekmede en fazla 10 görsel / 150 MB sınırında tutulur. İkinci kopyadan sonra mouse yanında `▣ N` rozeti görünür. Mouse ondan uzaklaşınca yumuşak companion takibi yapar; rozete doğru yönelince frenler, sabitlenir ve 44×36 px tıklanabilir hedefe dönüşür. Hover'da daha parlak, %10 büyük halo alır; mouse rozeti bırakır bırakmaz yeni mouse konumunun yanına geri gelir. Tıklandığında liste seçilir; çoklu görüntüyü ayrı native pano öğeleri olarak yazmak için hâlâ opt-in Koppy Bridge gerekir. Canlı Kontrol yalnız erişilebilir yedek olarak `Son N` ve `×` gösterir; `×` sistem panosuna dokunmaz.
 - Ayar arayüzü sandbox'lıdır; 91 mevcut Picviewer ayarının saklama sözleşmesini korur.
 - `@updateURL` / `@downloadURL` GitHub'daki sürüm dosyasına bağlıdır. Tampermonkey'de **Automatic installation** açık olmalıdır.
+- **Yerel Tanı Beyni:** Koppy, tarayıcı sekmesinde sınırlı/redakte bir olay halkası tutar ve son 30 olayı Tampermonkey saklamasına yerel olarak yazar; Bridge ise yalnız yerelde 128 KB'lık redakte `diagnostics.ndjson` günlüğü yazar. URL, token, HTTP header/cookie, görsel baytları ve pano içeriği kaydedilmez veya dışarı gönderilmez. Bridge başarısızlığında bir sağlık yoklaması ve tek sınırlı yeniden deneme yapılır; otomatik kod değişikliği/push yapılmaz.
 
 ## Doğrulama
 
@@ -71,3 +72,4 @@
 - Tampermonkey kurulum sayfası Zen'de arka planda açıldı. İlk kurulumdan sonra **Automatic installation** açık olmalıdır.
 - 0.5.1: Zen/Firefox Tampermonkey'nin `@connect *` altında loopback isteğini Bridge'e ulaşmadan kesebildiği canlı hata görüldü. Metadata'ya dar açık `@connect 127.0.0.1` ve `@connect localhost` izinleri eklendi; Bridge servisi sağlıklıydı ve hata anında hiç istek almamıştı.
 - 0.5.2: v0.5.1 canlı denemesinde Bridge logu yine boş kaldı. Loopback isteği eski callback GM API'sinden çıkmıyordu; Bridge artık Tampermonkey 5.5'in Firefox/Zen Promise tabanlı `GM.xmlHttpRequest` taşımasını önceliklendirir. Bu taşıma için unit testi eklendi.
+- 0.5.3: Yerel Tanı Beyni eklendi. Kopya aday çözümü, indirme/decode, Clipboard API ve Bridge taşıması ayrı olaylarla; hiçbir URL/token/pano içeriği tutmadan kayda geçer. Bridge, inbound istekleri/HTTP sonucunu redakte ve boyut sınırlı yerel günlüğe yazar; health yanıtında son durum görünür. Ulaşılamayan Bridge için bir health + tek yeniden deneme ile güvenli oto-toparlama yapılır. Canlı Zen doğrulaması bu sürüm yüklendikten sonra beklenir.

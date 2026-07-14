@@ -1,6 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const KoppyBridge = require("../../src/koppy-bridge.js");
+const KoppyDiagnostics = require("../../src/koppy-diagnostics.js");
 
 test("Koppy Bridge pairs in the Tampermonkey world and frames independent PNGs", async () => {
     const calls = [];
@@ -58,4 +59,33 @@ test("Koppy Bridge prefers Tampermonkey's modern Firefox transport", async t => 
     const png = new Blob([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], { type: "image/png" });
     assert.deepEqual(await bridge.writeImages([{ blob: png }, { blob: png }]), { count: 2 });
     assert.equal(modernCalls, 2);
+});
+
+test("Koppy Bridge records redacted transport facts and performs one bounded recovery", async t => {
+    const previous = global.GM;
+    t.after(() => {
+        if (previous === undefined) delete global.GM;
+        else global.GM = previous;
+    });
+    KoppyDiagnostics.clear();
+    let imageCalls = 0;
+    global.GM = {
+        xmlHttpRequest(options) {
+            if (options.method === "GET" && /\/token$/.test(options.url)) {
+                return Promise.resolve({ status: 200, responseText: JSON.stringify({ ok: true, token: "r".repeat(43) }) });
+            }
+            if (options.method === "GET" && /\/health$/.test(options.url)) return Promise.resolve({ status: 200, responseText: JSON.stringify({ ok: true }) });
+            imageCalls += 1;
+            return imageCalls === 1
+                ? Promise.reject(new Error("network refused http://private.example/secret"))
+                : Promise.resolve({ status: 200, responseText: JSON.stringify({ ok: true, count: 2 }) });
+        },
+    };
+    const bridge = KoppyBridge.create({ Blob, diagnostics: KoppyDiagnostics });
+    const png = new Blob([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], { type: "image/png" });
+    assert.deepEqual(await bridge.writeImages([{ blob: png }, { blob: png }]), { count: 2 });
+    assert.equal(imageCalls, 2);
+    const trace = JSON.stringify(KoppyDiagnostics.snapshot());
+    assert.match(trace, /bridge_recovery_ok/);
+    assert.doesNotMatch(trace, /private\.example|secret|Bearer|token/);
 });
