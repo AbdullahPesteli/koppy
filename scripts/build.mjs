@@ -73,7 +73,7 @@ const replacements = new Map([
     ["// @name:pt-BR           Picviewer CE+", "// @name:pt-BR           Koppy"],
     ["// @name:ru              Picviewer CE+", "// @name:ru              Koppy"],
     ["// @author               NLF && ywzhaiqi && hoothin", "// @author               NLF && ywzhaiqi && hoothin; Koppy fork by pestly"],
-    ["// @version              2026.2.6.1", "// @version              0.5.0"],
+    ["// @version              2026.2.6.1", "// @version              0.5.1"],
     ["// @namespace            https://github.com/hoothin/UserScripts", "// @namespace            https://github.com/AbdullahPesteli/koppy"],
     ["// @homepage             https://pv.hoothin.com/", "// @homepage             https://github.com/AbdullahPesteli/koppy"],
     ["// @supportURL           https://github.com/hoothin/UserScripts/issues", "// @supportURL           https://github.com/AbdullahPesteli/koppy/issues"],
@@ -89,6 +89,12 @@ const koppyUpdateMetadata = "// @updateURL            " + updateUrl + "\n// @dow
 const koppySupportUrl = "// @supportURL           https://github.com/AbdullahPesteli/koppy/issues";
 if (!source.includes(koppySupportUrl)) throw new Error("Koppy support URL marker missing after metadata replacement");
 source = source.replace(koppySupportUrl, koppySupportUrl + "\n" + koppyUpdateMetadata);
+
+// Tampermonkey on Firefox/Zen can reject loopback requests despite @connect *.
+// Keep this narrow, explicit declaration for Koppy Bridge's local-only helper.
+const connectWildcard = "// @connect              *";
+if (!source.includes(connectWildcard)) throw new Error("Upstream @connect wildcard marker missing");
+source = source.replace(connectWildcard, connectWildcard + "\n// @connect              127.0.0.1\n// @connect              localhost");
 
 const remoteRequires = [
     "// @require              https://update.greasyfork.org/scripts/6158/23710/GM_config%20CN.js",

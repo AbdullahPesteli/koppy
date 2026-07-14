@@ -1,6 +1,6 @@
 # Koppy — Durum
 
-**Sürüm:** 0.5.0
+**Sürüm:** 0.5.1
 **Lisans:** MIT
 **Dağıtım:** `dist/Koppy.user.js` üzerinden Tampermonkey
 
@@ -69,3 +69,4 @@
 - 2026-07-14 araştırması: macOS `NSPasteboard` birden fazla bağımsız öğe yazabilir; ancak web Clipboard API spesifikasyonu `write()` çağrısında son `ClipboardItem`'ı seçer, Firefox extension API'sinde de `additionalItems` yoktur. Bu nedenle sonradan karar verilen çoklu-görsel yapıştırma, Tampermonkey tek başına değil opt-in yerel Koppy Bridge ile gerçekçi ve doğrulanabilir bir yoldur.
 - 0.5.0: Koppy Bridge eklendi. Tampermonkey sandbox’ı rastgele eşleme anahtarıyla yalnız loopback helper’ına framed PNG listesi yollar; helper her PNG’yi ayrı `NSPasteboardItem` olarak yazar. `npm run bridge:selftest` genel panoya dokunmadan adlandırılmış test panosunda 2 bağımsız PNG öğesini doğruladı; kurulu LaunchAgent sağlık endpoint’i `{"ok":true,"version":"0.5.0"}` döndü. Gerçek Zen→ChatGPT tek-yapıştırma kabulü henüz kullanıcı tarafından denenmedi.
 - Tampermonkey kurulum sayfası Zen'de arka planda açıldı. İlk kurulumdan sonra **Automatic installation** açık olmalıdır.
+- 0.5.1: Zen/Firefox Tampermonkey'nin `@connect *` altında loopback isteğini Bridge'e ulaşmadan kesebildiği canlı hata görüldü. Metadata'ya dar açık `@connect 127.0.0.1` ve `@connect localhost` izinleri eklendi; Bridge servisi sağlıklıydı ve hata anında hiç istek almamıştı.
