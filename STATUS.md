@@ -1,6 +1,6 @@
 # Koppy — Durum
 
-**Sürüm:** 0.5.5
+**Sürüm:** 0.5.6
 **Lisans:** MIT
 **Dağıtım:** `dist/Koppy.user.js` üzerinden Tampermonkey
 
@@ -75,3 +75,4 @@
 - 0.5.3: Yerel Tanı Beyni eklendi. Kopya aday çözümü, indirme/decode, Clipboard API ve Bridge taşıması ayrı olaylarla; hiçbir URL/token/pano içeriği tutmadan kayda geçer. Bridge, inbound istekleri/HTTP sonucunu redakte ve boyut sınırlı yerel günlüğe yazar; health yanıtında son durum görünür. Ulaşılamayan Bridge için bir health + tek yeniden deneme ile güvenli oto-toparlama yapılır. Canlı Zen doğrulaması bu sürüm yüklendikten sonra beklenir.
 - 0.5.4: Firefox/Zen'in `createImageBitmap()` ile çözemediği `image/svg+xml` için blob-URL `<img>` → canvas → `image/png` fallback'i eklendi. SVG bitmap reddi fixture'ı bu yolu ve geçici URL'nin bırakılmasını doğrular.
 - 0.5.5: Kopya geri bildirimi artık ilişkisiz açık QuickHover penceresine sıçramaz; gerçek kaynak görselin üzerinde kalır. Son Kopyalar aynı kaynak/ebat yeniden denendiğinde şişmez, normal pano kopyası yine yapılır. 18 px üzerindeki küçük gerçek görseller de hedef olur. Tarayıcıdaki yalnız terminal, redakte tanı olayları eşlenmiş loopback Bridge günlüğüne aktarılır; böylece sonraki hata yerelden doğrudan ayrıştırılabilir.
+- 0.5.6: Bridge modülünün hata etiketi ana sürümle hizalandı. Zen/Tampermonkey'de modern `GM.xmlHttpRequest` loopback'e ulaşamazsa, aynı sınırlı isteği callback tabanlı `GM_xmlhttpRequest` ile bir kez yeniden dener; böylece iki Tampermonkey taşıması da kullanılır.

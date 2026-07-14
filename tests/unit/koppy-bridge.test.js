@@ -61,6 +61,28 @@ test("Koppy Bridge prefers Tampermonkey's modern Firefox transport", async t => 
     assert.equal(modernCalls, 2);
 });
 
+test("Koppy Bridge falls back to Tampermonkey's callback transport when modern loopback fails", async t => {
+    const previous = global.GM;
+    t.after(() => {
+        if (previous === undefined) delete global.GM;
+        else global.GM = previous;
+    });
+    global.GM = { xmlHttpRequest() { return Promise.reject(new Error("network refused")); } };
+    let legacyCalls = 0;
+    const bridge = KoppyBridge.create({
+        Blob,
+        getValue: () => "f".repeat(43),
+        gmRequest(options) {
+            legacyCalls += 1;
+            queueMicrotask(() => options.onload({ status: 200, responseText: JSON.stringify({ ok: true, count: 2 }) }));
+            return { abort() {} };
+        },
+    });
+    const png = new Blob([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], { type: "image/png" });
+    assert.deepEqual(await bridge.writeImages([{ blob: png }, { blob: png }]), { count: 2 });
+    assert.equal(legacyCalls, 1);
+});
+
 test("Koppy Bridge records redacted transport facts and performs one bounded recovery", async t => {
     const previous = global.GM;
     t.after(() => {

@@ -9,7 +9,7 @@
     // executed in Tampermonkey's isolated world, so a page never receives the
     // pairing secret or the response body. The helper also sends no CORS header.
     const ORIGIN = "http://127.0.0.1:47651";
-    const SCRIPT_VERSION = "0.5.3";
+    const SCRIPT_VERSION = "0.5.6";
     const TOKEN_KEY = "koppy.bridge.token.v1";
     const MAX_ITEMS = 10;
     const MAX_BYTES = 150 * 1024 * 1024;
@@ -71,11 +71,12 @@
         const attempt = context && context.attempt || 1;
         const startedAt = Date.now();
         const mark = (event, fields) => diagnostic(settings, event, Object.assign({ flowId, route, attempt, durationMs: Date.now() - startedAt }, fields));
-        mark("bridge_request_start", { transport: typeof GM !== "undefined" && GM && typeof GM.xmlHttpRequest === "function" ? "modern" : "legacy" });
+        const modernAvailable = !context?.forceLegacy && typeof GM !== "undefined" && GM && typeof GM.xmlHttpRequest === "function";
+        mark("bridge_request_start", { transport: modernAvailable ? "modern" : "legacy" });
         // Tampermonkey 5.5 on Firefox/Zen has a newer Promise transport. Prefer
         // it here: it keeps the loopback request inside TM's extension context
         // instead of relying on the legacy callback bridge.
-        if (typeof GM !== "undefined" && GM && typeof GM.xmlHttpRequest === "function") {
+        if (modernAvailable) {
             const request = Object.assign({}, options);
             delete request.onload;
             delete request.onerror;
@@ -95,12 +96,18 @@
                     }, cause => {
                         const failure = transportFailure(cause);
                         mark("bridge_request_failed", { transport: "modern", errorKind: failure.kind, errorCode: failure.code });
-                        reject(error(failure.message, failure.code));
+                        if (typeof gmRequest === "function") {
+                            diagnostic(settings, "bridge_transport_fallback", { flowId, route, errorCode: failure.code });
+                            gmCall(gmRequest, options, settings, Object.assign({}, context, { forceLegacy: true })).then(resolve, reject);
+                        } else reject(error(failure.message, failure.code));
                     });
                 } catch (cause) {
                     const failure = transportFailure(cause);
                     mark("bridge_request_failed", { transport: "modern", errorKind: failure.kind, errorCode: failure.code });
-                    reject(error(failure.message, failure.code));
+                    if (typeof gmRequest === "function") {
+                        diagnostic(settings, "bridge_transport_fallback", { flowId, route, errorCode: failure.code });
+                        gmCall(gmRequest, options, settings, Object.assign({}, context, { forceLegacy: true })).then(resolve, reject);
+                    } else reject(error(failure.message, failure.code));
                 }
             });
         }
