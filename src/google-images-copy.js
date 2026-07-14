@@ -17,6 +17,8 @@
     // unbounded amount of decoded image data in the tab.
     const MAX_STACK_ITEMS = 10;
     const MAX_STACK_BYTES = 150 * 1024 * 1024;
+    const STACK_BURST_WINDOW_MS = 1800;
+    const STACK_COOLDOWN_MS = 2400;
     const REQUEST_TIMEOUT_MS = 20000;
     const GOOGLE_HOSTNAMES = new Set(["google.com", "google.com.tr"]);
     const GOOGLE_METADATA_CACHE = new WeakMap();
@@ -1071,6 +1073,8 @@
         const doc = documentLike;
         const win = windowLike || (doc && doc.defaultView);
         let root;
+        let label;
+        let cooldownBar;
         const tails = [];
         const pointerHistory = [];
 
@@ -1088,8 +1092,16 @@
                 padding: "4px 7px", borderRadius: "999px", border: "1px solid rgba(124,156,255,.72)",
                 color: "#eff3ff", background: "rgba(38,53,87,.94)", boxShadow: "0 5px 16px rgba(0,0,0,.25)",
                 font: "700 11px/1 -apple-system, BlinkMacSystemFont, sans-serif", whiteSpace: "nowrap",
-                transform: "translate(12px, 12px) scale(.92)", opacity: "0", transition: "opacity 160ms ease, transform 160ms ease",
+                transform: "translate(12px, 12px) scale(.92)", opacity: "0", overflow: "hidden", transition: "opacity 160ms ease, transform 160ms ease",
             });
+            label = doc.createElement("span");
+            root.appendChild(label);
+            cooldownBar = doc.createElement("span");
+            Object.assign(cooldownBar.style, {
+                position: "absolute", display: "none", left: "0", right: "0", bottom: "0", height: "2px",
+                transformOrigin: "left", background: "#9db4ff", opacity: ".95",
+            });
+            root.appendChild(cooldownBar);
             for (let index = 0; index < 3; index += 1) {
                 const tail = doc.createElement("div");
                 tail.className = "koppy-stack-cursor-tail";
@@ -1132,7 +1144,7 @@
         function show(pointer, count) {
             const item = place(pointer);
             if (!item || !count) return;
-            item.textContent = "▣ " + count;
+            label.textContent = "▣ " + count;
             item.style.display = "block";
             item.style.opacity = "1";
             item.style.transform = "translate(12px, 12px) scale(1)";
@@ -1144,6 +1156,7 @@
             root.style.display = "none";
             root.style.opacity = "0";
             pointerHistory.length = 0;
+            if (cooldownBar) cooldownBar.style.display = "none";
             tails.forEach(tail => { tail.style.display = "none"; });
         }
 
@@ -1187,6 +1200,19 @@
         return {
             collect,
             hide,
+            cooldown(duration) {
+                if (!root || root.style.display === "none" || !cooldownBar || reducedMotion()) return;
+                cooldownBar.style.display = "block";
+                cooldownBar.style.transition = "none";
+                cooldownBar.style.transform = "scaleX(1)";
+                const drain = () => {
+                    if (!cooldownBar) return;
+                    cooldownBar.style.transition = "transform " + Math.max(1, Number(duration) || 1) + "ms linear";
+                    cooldownBar.style.transform = "scaleX(0)";
+                };
+                if (win && typeof win.requestAnimationFrame === "function") win.requestAnimationFrame(drain);
+                else setTimeout(drain, 0);
+            },
             move(pointer, state) {
                 if (!root || root.style.display === "none") return;
                 if (!state || !state.enabled || !state.count) return hide();
@@ -1238,15 +1264,21 @@
             timeout: deps.timeout || REQUEST_TIMEOUT_MS,
             onProgress,
         }));
+        const burstWindowMs = Number.isFinite(Number(deps.stackBurstWindowMs)) ? Math.max(100, Number(deps.stackBurstWindowMs)) : STACK_BURST_WINDOW_MS;
+        const stackCooldownMs = Number.isFinite(Number(deps.stackCooldownMs)) ? Math.max(100, Number(deps.stackCooldownMs)) : STACK_COOLDOWN_MS;
         let current = null;
         let activeCopy = null;
         let activePreview = null;
         let documentPreview = null;
         let lastPointer = null;
         let started = false;
+        let burstCandidate = null;
+        let burstTimer = null;
+        let cooldownTimer = null;
         const stackCursor = createStackCursorCollector(documentLike, windowLike);
         const stack = {
             enabled: Boolean(deps.stackEnabled),
+            parked: false,
             items: [],
             bytes: 0,
             listeners: new Set(),
@@ -1255,6 +1287,7 @@
         function stackState() {
             return {
                 enabled: stack.enabled,
+                parked: stack.parked,
                 count: stack.items.length,
                 bytes: stack.bytes,
                 maxItems: MAX_STACK_ITEMS,
@@ -1272,9 +1305,46 @@
 
         function setStackEnabled(enabled) {
             stack.enabled = Boolean(enabled);
+            stack.parked = false;
+            if (!stack.enabled) stopCooldown();
             const state = emitStackChange();
             if (!state.enabled || !state.count) stackCursor.hide();
             return state;
+        }
+
+        function clearBurstCandidate() {
+            burstCandidate = null;
+            if (burstTimer) clearTimeout(burstTimer);
+            burstTimer = null;
+        }
+
+        function stopCooldown() {
+            if (cooldownTimer) clearTimeout(cooldownTimer);
+            cooldownTimer = null;
+        }
+
+        function parkStack() {
+            stopCooldown();
+            if (!stack.items.length) return;
+            stack.enabled = false;
+            stack.parked = true;
+            stackCursor.hide();
+            emitStackChange();
+            notify("Stack hazır: " + stack.items.length + " görsel", "success");
+        }
+
+        function restartStackCooldown() {
+            if (!stack.enabled || !stack.items.length) return;
+            stopCooldown();
+            stackCursor.cooldown(stackCooldownMs);
+            cooldownTimer = setTimeout(parkStack, stackCooldownMs);
+            if (cooldownTimer && typeof cooldownTimer.unref === "function") cooldownTimer.unref();
+        }
+
+        function rememberBurstCandidate(prepared, source) {
+            clearBurstCandidate();
+            burstCandidate = { prepared, source, pointer: lastPointer && { x: lastPointer.x, y: lastPointer.y }, at: Date.now() };
+            burstTimer = setTimeout(clearBurstCandidate, burstWindowMs);
         }
 
         function clearStack() {
@@ -1283,6 +1353,9 @@
             // existing clipboard untouched.
             stack.items = [];
             stack.bytes = 0;
+            stack.parked = false;
+            clearBurstCandidate();
+            stopCooldown();
             stackCursor.hide();
             return emitStackChange();
         }
@@ -1594,8 +1667,7 @@
         }
 
         async function copyHoveredImage(event) {
-            const stackShortcut = Boolean(event && event.altKey);
-            if (!isCopyGesture(event, windowLike, { allowAlt: stackShortcut })) {
+            if (!isCopyGesture(event, windowLike)) {
                 return { status: "not-applicable" };
             }
             // Google can replace or move a result without another pointer event. Re-read the
@@ -1634,7 +1706,6 @@
                 element: stateAtCopy.element,
                 candidates: stateAtCopy.candidates.slice(),
                 candidate: stateAtCopy.candidate,
-                stackShortcut,
                 activeRequest: null,
                 cancelled: false,
             };
@@ -1649,13 +1720,24 @@
                     new ClipboardItemCtor({ "image/png": clipboardBlobPromise }),
                 ]));
                 const [prepared] = await Promise.all([preparedPromise, writePromise]);
-                // ⌘⌥C is the quick “start collecting here” gesture. It performs
-                // the same real clipboard copy first, then leaves Stack active for
-                // subsequent ordinary ⌘C presses.
-                if (copyState.stackShortcut && !stack.enabled) setStackEnabled(true);
-                const stacked = addToStack(prepared);
+                let stacked;
+                if (stack.enabled) {
+                    stacked = addToStack(prepared);
+                } else if (burstCandidate && Date.now() - burstCandidate.at <= burstWindowMs) {
+                    // A second rapid ordinary copy starts the collector with both
+                    // images. One-off Cmd+C stays completely ordinary.
+                    const first = burstCandidate;
+                    clearBurstCandidate();
+                    setStackEnabled(true);
+                    addToStack(first.prepared);
+                    stacked = addToStack(prepared);
+                } else {
+                    rememberBurstCandidate(prepared, copyState.element);
+                    stacked = { added: false, state: stackState() };
+                }
                 feedback.complete(copyState.element, prepared.width, prepared.height, prepared.isThumbnailFallback, stacked);
                 if (stacked.added) stackCursor.collect(copyState.element, lastPointer, stacked.state.count);
+                if (stacked.added) restartStackCooldown();
                 let message = (prepared.isThumbnailFallback ? "Önizleme kopyalandı: " : "Kopyalandı: ") + prepared.width + "×" + prepared.height;
                 if (stacked.added) message += " · Stack’e eklendi (" + stacked.state.count + ")";
                 else if (stack.enabled && stacked.reason === "item-limit") message += " · Stack dolu (" + MAX_STACK_ITEMS + ")";
@@ -1668,7 +1750,7 @@
                     source: prepared.source,
                     isThumbnailFallback: prepared.isThumbnailFallback,
                     stacked: stacked.added,
-                    stackStarted: copyState.stackShortcut,
+                    stackStarted: stacked.added && stacked.state.count === 2,
                     stack: stacked.state,
                 };
             } catch (error) {
@@ -1684,6 +1766,14 @@
         }
 
         function onKeyDown(event) {
+            if (String(event && event.key || "") === "Escape" && stack.enabled && stack.items.length) {
+                event.preventDefault();
+                if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+                else if (typeof event.stopPropagation === "function") event.stopPropagation();
+                clearStack();
+                notify("Stack iptal edildi · pano korunuyor", "success");
+                return;
+            }
             if (isDocumentPreviewGesture(event)) void previewHoveredDocument();
             void copyHoveredImage(event);
         }
@@ -1724,6 +1814,8 @@
                 }
                 cancelAll();
                 clearStack();
+                clearBurstCandidate();
+                stopCooldown();
                 started = false;
             },
             setHoveredImage,

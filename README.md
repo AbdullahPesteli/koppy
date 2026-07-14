@@ -45,11 +45,12 @@ yalnız Koppy’nin belleğini serbest bırakır, mevcut sistem clipboard içeri
 desteklemediği çok-öğeli clipboard yerine ilerideki ayrı-dosya dışa-aktarma akışı için hazırlık alanıdır.
 Stack açık bir kopyada, görselin üzerindeki normal başarı çizgisinin yanında kısa `+1 Stack · N görsel`
 geri bildirimi ve toast içinde `Stack’e eklendi (N)` görünür; böylece aynı görselin listeye alındığı açıkça anlaşılır.
-Hızlı başlangıç için görsel üzerindeyken `⌘⌥C` bas: normal PNG kopyası yapılır, Stack açılır ve küçük kart
-imlecin yanındaki `▣ 1` rozetine uçar. Kısayol Türkçe macOS klavyesinde de karaktere değil fiziksel C
-tuşuna bağlıdır. Sonraki normal `⌘C` kopyaları sayıyı artırır; rozet sayfada imleci
-takip eder. Arkasındaki üç küçük kart/dot, hareket yönüne gecikmeli kuyruk yapar. Rozet gerçek macOS
-cursor’u değildir, cursor davranışını değiştirmeyen sayfa katmanıdır.
+Hızlı başlangıç için iki görseli kısa arayla normal `⌘C` ile kopyala: ikinci kopya Stack burst’ünü
+başlatır ve iki kart collector’a girer. Sonraki her `⌘C`, imleçteki ince soğuma çizgisini yeniler; süre
+bitince Stack `Hazır N` olarak park edilir ve kuyruk kapanır. Aktif burst’te `Esc`, yalnız Koppy Stack’ini
+iptal eder; sistem panosundaki son kopyaya dokunmaz. Rozet sayfada imleci takip eder, arkasındaki üç küçük
+kart/dot hareket yönüne gecikmeli kuyruk yapar. Rozet gerçek macOS cursor’u değildir, cursor davranışını
+değiştirmeyen sayfa katmanıdır.
 
 Hover yalnız URL adayını çözer; ağ/decode işlemi `Cmd+C` öncesinde başlamaz. Google'da Koppy, Picviewer'ın
 çözdüğü kaynakla birlikte bağlantı parametreleri, güncel metadata, lazy-load alanları, `picture`/`srcset` ve

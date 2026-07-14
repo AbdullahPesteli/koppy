@@ -268,7 +268,7 @@ test("opt-in Stack retains copied PNGs without changing the single-image system 
     });
     const stackEvents = [];
     controller.onStackChange(state => stackEvents.push(state));
-    assert.deepEqual(controller.getStackState(), { enabled: false, count: 0, bytes: 0, maxItems: 10, maxBytes: 150 * 1024 * 1024 });
+    assert.deepEqual(controller.getStackState(), { enabled: false, parked: false, count: 0, bytes: 0, maxItems: 10, maxBytes: 150 * 1024 * 1024 });
     controller.setStackEnabled(true);
     controller.setHoveredImage(image);
     const copy = await controller.copyHoveredImage({ key: "c", metaKey: true, target: dom.window.document.body, preventDefault() {}, stopImmediatePropagation() {} });
@@ -280,10 +280,12 @@ test("opt-in Stack retains copied PNGs without changing the single-image system 
     assert.equal(clipboardWrites[0].type, "image/png");
     assert.equal(clipboardWrites[0].size, 9);
 
-    const cleared = controller.clearStack();
-    assert.equal(cleared.count, 0);
-    assert.equal(cleared.enabled, true);
-    assert.equal(clipboardWrites.length, 1, "clearing Koppy Stack must not write or clear the system clipboard");
+    assert.equal(controller.start(), true);
+    const escape = new dom.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+    dom.window.document.dispatchEvent(escape);
+    assert.equal(escape.defaultPrevented, true);
+    assert.equal(controller.getStackState().count, 0);
+    assert.equal(clipboardWrites.length, 1, "cancelling Koppy Stack must not write or clear the system clipboard");
     assert.equal(stackEvents.at(-1).count, 0);
 });
 

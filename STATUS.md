@@ -1,6 +1,6 @@
 # Koppy — Durum
 
-**Sürüm:** 0.4.10
+**Sürüm:** 0.4.11
 **Lisans:** MIT
 **Dağıtım:** `dist/Koppy.user.js` üzerinden Tampermonkey
 
@@ -11,7 +11,7 @@
 - Kopyalama, mümkünse QuickHover'ın süzülen preview panelinde ince ilerleme çizgisi ve çözünürlüklü başarı bilgisi verir; küçük kaynak görsel yalnız ince hedef çerçevesi taşır. Metin kopyalamayı bozmaz.
 - QuickHover önizlemesi boş boyut ayarında ekranı kaplamak yerine yaklaşık ekranın %72'sine sığar; elle girilen sınır korunur.
 - Tampermonkey menüsündeki **Koppy Canlı Kontrol**, sık kullanılan modifier, FloatBar konumu ve preview boyutunu küçük bir panelden gerçek davranışa anında uygular. Panel üst sağda açılır, başlığından sürüklenebilir; **sabitle** açıkken sayfada deneme yaparken kapanmaz. Aynı paneldeki **Koppy’yi güncelle** eylemi Tampermonkey güncelleme sayfasını doğrudan açar.
-- Canlı Kontrol’deki varsayılan-kapalı **Görsel Stack**, normal `Cmd+C` sonucunu değiştirmez: her basış macOS panosuna yalnız son PNG’yi yazar. Stack açıksa aynı başarılı PNG, sayfa belleğindeki geçici listeye de eklenir; en fazla 10 görsel / 150 MB tutulur. Görsel üstünde `⌘⌥C`, normal PNG kopyasını yapıp Stack’i hızlıca başlatır; küçük kart kaynaktan imleç-yanı `▣ N` rozete uçar ve rozet imleci takip eder. Rozetin arkasındaki üç küçük kart/dot, fare geçmişine gecikmeli kuyruk yapar. Kopya anında görsel üstünde `+1 Stack · N görsel` çipi görünür; başlıktaki noktalı `Stack N` sayacı ve mini `×` bunun kalıcı durumunu taşır. `×` yalnız bu listeyi bırakır, sistem panosuna dokunmaz. Stack, çoklu görüntüyü web panosuna yazma vaadi değildir; sonraki dosya dışa-aktarma akışı için hazırlık katmanıdır.
+- Canlı Kontrol’deki varsayılan-kapalı **Görsel Stack**, normal `Cmd+C` sonucunu değiştirmez: her basış macOS panosuna yalnız son PNG’yi yazar. Kısa aralıkta ikinci normal `Cmd+C`, ilk görseli de yakalayan Stack burst’ünü başlatır; sonraki her kopya soğuma çizgisini yeniler. Süre bitince Stack `Hazır N` olarak park edilir ve kuyruk kapanır; aktif burst’te `Esc` yalnız Stack’i iptal eder. En fazla 10 görsel / 150 MB tutulur. Küçük kart kaynaktan imleç-yanı `▣ N` rozete uçar ve rozet imleci takip eder. Rozetin arkasındaki üç küçük kart/dot, fare geçmişine gecikmeli kuyruk yapar. Kopya anında görsel üstünde `+1 Stack · N görsel` çipi görünür; başlıktaki noktalı `Stack N`/`Hazır N` sayacı ve mini `×` bunun kalıcı durumunu taşır. `×` yalnız bu listeyi bırakır, sistem panosuna dokunmaz. Stack, çoklu görüntüyü web panosuna yazma vaadi değildir; sonraki dosya dışa-aktarma akışı için hazırlık katmanıdır.
 - Ayar arayüzü sandbox'lıdır; 91 mevcut Picviewer ayarının saklama sözleşmesini korur.
 - `@updateURL` / `@downloadURL` GitHub'daki sürüm dosyasına bağlıdır. Tampermonkey'de **Automatic installation** açık olmalıdır.
 
@@ -61,4 +61,5 @@
 - 0.4.8: Hızlı collector hareketi eklendi. `⌘⌥C` ilk görseli normal panoya da kopyalayarak Stack’i etkinleştirir; kart 380ms’de kaynaktan imleç-yanı `▣ N` sayacına uçar. Sayaç Stack açıkken imleci takip eder. Browser E2E, gerçek `Meta+Alt+C` tuş olayını, ikinci normal `Meta+C` kopyasını, tek PNG clipboard sonucunu ve rozetin fare koordinatını takip ettiğini doğrular.
 - 0.4.9: `⌘⌥C` collector kısayolu Türkçe macOS klavye düzeninde `⌥C → ç` karakter dönüşümünden etkilenmez; fiziksel `KeyC` de kabul edilir. Unit testi hem `c` hem `ç`/`KeyC` olayını doğrular.
 - 0.4.10: Cursor collector’ın arkasına üç öğelik gecikmeli kart/dot kuyruğu eklendi. Browser E2E, rozetin imleci takip ettiğini, üç kuyruk öğesinin görünür olduğunu ve farklı geçmiş koordinatlarında kaldığını doğrular.
+- 0.4.11: Zen’le çakışan `⌘⌥C` kaldırıldı. İki hızlı normal `⌘C`, ilk kopyayı da geriye dönük Stack’e alan burst akışını başlatır; her ekleme 2,4 saniyelik soğuma çizgisini yeniler. Soğuyunca `Hazır N` park durumu olur ve kuyruk kapanır. Aktif burst’te `Esc` Stack’i temizler, pano korunur. Browser E2E burst başlangıcını, cooldown parkını, rozet/kuyruk görünümünü ve tek PNG pano sonucunu doğrular.
 - Tampermonkey kurulum sayfası Zen'de arka planda açıldı. İlk kurulumdan sonra **Automatic installation** açık olmalıdır.

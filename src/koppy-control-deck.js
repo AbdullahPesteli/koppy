@@ -60,7 +60,7 @@
         let status;
         let isOpen = false;
         let closeTimer;
-        let statusMessage = "⌘⌥C Stack başlatır · ⌘C normal kopyalar";
+        let statusMessage = "Hızlı iki ⌘C Stack başlatır · Esc iptal eder";
         let statusError = false;
         let isPinned = false;
         let drag;
@@ -124,17 +124,17 @@
             title.lastChild.append(create(doc, "strong", "", "Canlı Kontrol"), create(doc, "small", "", "değişiklikler anında kaydolur"));
             title.addEventListener("pointerdown", beginDrag);
             const stackToggle = typeof settings.setStackEnabled === "function"
-                ? create(doc, "button", "stack-toggle", stackState.enabled ? "Stack " + stackState.count : "Topla")
+                ? create(doc, "button", "stack-toggle", stackState.enabled ? "Stack " + stackState.count : stackState.parked ? "Hazır " + stackState.count : "Topla")
                 : null;
             if (stackToggle) {
                 stackToggle.type = "button";
                 stackToggle.setAttribute("aria-pressed", String(stackState.enabled));
                 stackToggle.setAttribute("aria-label", stackState.enabled
                     ? "Görsel Stack açık, " + stackState.count + " görsel birikti"
-                    : "Görsel Stack kapalı");
+                    : stackState.parked ? "Görsel Stack hazır, " + stackState.count + " görsel bekliyor" : "Görsel Stack kapalı");
                 stackToggle.title = stackState.enabled
                     ? "Stack açık: Cmd+C normal panoya ve geçici listeye ekler"
-                    : "⌘⌥C ile Stack başlat; normal Cmd+C yalnız panoya kopyalar";
+                    : stackState.parked ? "Stack hazır: tıklayarak toplamaya devam et" : "İki hızlı Cmd+C Stack’i otomatik başlatır";
                 stackToggle.addEventListener("click", event => {
                     if (!isUserEvent(event)) return;
                     const next = settings.setStackEnabled(!stackState.enabled) || stackState;

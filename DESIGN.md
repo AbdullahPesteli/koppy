@@ -49,10 +49,12 @@ Koppy, görsel işi sırasında arka planda güvenilir kalan kişisel bir araçt
   oturarak görünür; bu, normal panoya kopyalamanın yanında geçici listeye de eklendiğini açıkça ayırır.
   Canlı Kontrol başlığındaki **Topla** düğmesi açıkken noktalı `Stack N` durumuna döner; N sıfırdan büyükse
   yanındaki mini `×` yalnız Stack belleğini temizler. Hareketler reduced-motion tercihinde kapalıdır.
-- Görsel üzerinde `⌘⌥C`, normal PNG kopyasını yaptıktan sonra Stack’i de başlatan hızlı collector
-  kısayoludur. Başarılı kart, kaynağın merkezinden imlecin yaklaşık 12px sağ-altında beliren `▣ N`
-  rozetine 380ms’de küçülerek gider; rozet Stack açık ve boş değilken imleci takip eder. Bu gerçek OS
-  cursor’unu değiştirmez; sayfa üstündeki pointer-events kapalı bir eşlikçi katmandır.
+- Kısa sürede yapılan ikinci normal `⌘C`, tekil kopyanın davranışını bozmadan Stack burst’ünü başlatır;
+  iki kart birlikte collector’a girer. Her sonraki `⌘C` soğuma çizgisini yeniler. Başarılı kart, kaynağın
+  merkezinden imlecin yaklaşık 12px sağ-altında beliren `▣ N` rozetine 380ms’de küçülerek gider; rozet
+  Stack açık ve boş değilken imleci takip eder. Soğuma çizgisi bittiğinde Stack `Hazır N` olarak park edilir
+  ve kuyruk kaybolur. Aktif burst’te `Esc` iptal eder ama sistem panosunu değiştirmez. Bu gerçek OS cursor’unu
+  değiştirmez; sayfa üstündeki pointer-events kapalı bir eşlikçi katmandır.
 - Collector rozeti görünürken imlecin konum geçmişinden gelen üç küçük, gittikçe solan kart/dot arkada
   gecikmeli bir kuyruk oluşturur. Kuyruk hızlı hareketle uzar, imleç durunca yaklaşır; bu işlevsel Stack
   durumunun tatlı ama sakin hareketidir, reduced-motion tercihinde hiç çizilmez.

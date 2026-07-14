@@ -150,6 +150,7 @@ test("Stack mode keeps the regular clipboard as one current PNG while retaining 
         canvas.getContext("2d").fillRect(0, 0, 320, 180);
         const png = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
         const image = document.getElementById("image");
+        window.__stackRequests = 0;
         window.__stackController = window.KoppyGoogleCopy.createController({
             document,
             window,
@@ -157,14 +158,20 @@ test("Stack mode keeps the regular clipboard as one current PNG while retaining 
             navigator,
             ClipboardItem,
             resolvePic: () => ({ src: "https://images.example.test/original.png", type: "rule" }),
-            requestImage: () => ({ promise: Promise.resolve({ blob: png }), abort() {} }),
+            requestImage: () => {
+                window.__stackRequests += 1;
+                return { promise: Promise.resolve({ blob: png }), abort() {} };
+            },
             normalizeImage: async blob => ({ blob, width: 320, height: 180 }),
+            stackBurstWindowMs: 700,
+            stackCooldownMs: 1000,
         });
         window.__stackController.start();
     });
     await page.hover("#image");
-    await page.keyboard.press("Meta+Alt+C");
-    await expect.poll(() => page.evaluate(() => window.__stackController.getStackState().count)).toBe(1);
+    await page.keyboard.press("Meta+C");
+    await expect.poll(() => page.evaluate(() => window.__stackRequests)).toBe(1);
+    expect(await page.evaluate(() => window.__stackController.getStackState().count)).toBe(0);
     await page.keyboard.press("Meta+C");
     await expect.poll(() => page.evaluate(() => window.__stackController.getStackState().count)).toBe(2);
     await page.waitForTimeout(450);
@@ -215,8 +222,16 @@ test("Stack mode keeps the regular clipboard as one current PNG while retaining 
     fs.mkdirSync(path.resolve("test-results"), { recursive: true });
     await page.screenshot({ path: "test-results/koppy-stack-feedback.png" });
 
+    await page.waitForTimeout(450);
+    const parked = await page.evaluate(() => ({
+        stack: window.__stackController.getStackState(),
+        collectorDisplay: document.querySelector("#koppy-stack-cursor").style.display,
+    }));
+    expect(parked.stack).toMatchObject({ enabled: false, parked: true, count: 2 });
+    expect(parked.collectorDisplay).toBe("none");
+
     const cleared = await page.evaluate(() => window.__stackController.clearStack());
-    expect(cleared).toMatchObject({ enabled: true, count: 0, bytes: 0 });
+    expect(cleared).toMatchObject({ enabled: false, parked: false, count: 0, bytes: 0 });
     expect(await page.evaluate(async () => (await navigator.clipboard.read()).length)).toBe(1);
 });
 
