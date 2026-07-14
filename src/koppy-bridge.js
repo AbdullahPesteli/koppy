@@ -9,12 +9,13 @@
     // executed in Tampermonkey's isolated world, so a page never receives the
     // pairing secret or the response body. The helper also sends no CORS header.
     const ORIGIN = "http://127.0.0.1:47651";
+    const SCRIPT_VERSION = "0.5.2";
     const TOKEN_KEY = "koppy.bridge.token.v1";
     const MAX_ITEMS = 10;
     const MAX_BYTES = 150 * 1024 * 1024;
     const FRAME_TYPE = "application/vnd.koppy.images+binary";
 
-    function error(message) { return new Error("Koppy Bridge: " + message); }
+    function error(message) { return new Error("Koppy Bridge v" + SCRIPT_VERSION + ": " + message); }
 
     function parseJson(response) {
         if (response && response.response && typeof response.response === "object") return response.response;
@@ -24,6 +25,30 @@
     }
 
     function gmCall(gmRequest, options) {
+        // Tampermonkey 5.5 on Firefox/Zen has a newer Promise transport. Prefer
+        // it here: it keeps the loopback request inside TM's extension context
+        // instead of relying on the legacy callback bridge.
+        if (typeof GM !== "undefined" && GM && typeof GM.xmlHttpRequest === "function") {
+            const request = Object.assign({}, options);
+            delete request.onload;
+            delete request.onerror;
+            delete request.ontimeout;
+            delete request.onabort;
+            return new Promise((resolve, reject) => {
+                try {
+                    Promise.resolve(GM.xmlHttpRequest(request)).then(response => {
+                        const status = Number(response && response.status) || 0;
+                        if (status < 200 || status >= 300) {
+                            reject(error(status ? "yerel yardımcı HTTP " + status + " döndü" : "yerel yardımcı yanıt vermedi"));
+                            return;
+                        }
+                        resolve(response);
+                    }, () => reject(error("yerel yardımcıya bağlanılamadı")));
+                } catch (cause) {
+                    reject(error(cause && cause.message || "yerel istek başlatılamadı"));
+                }
+            });
+        }
         if (typeof gmRequest !== "function") return Promise.reject(error("Tampermonkey ağ izni yok"));
         return new Promise((resolve, reject) => {
             let settled = false;
@@ -125,5 +150,5 @@
         return { writeImages, frameImages: items => frameImages(items, BlobCtor) };
     }
 
-    return { FRAME_TYPE, MAX_BYTES, MAX_ITEMS, ORIGIN, TOKEN_KEY, create, frameImages };
+    return { FRAME_TYPE, MAX_BYTES, MAX_ITEMS, ORIGIN, SCRIPT_VERSION, TOKEN_KEY, create, frameImages };
 });

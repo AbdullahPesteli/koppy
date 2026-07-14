@@ -1,6 +1,6 @@
 # Koppy — Durum
 
-**Sürüm:** 0.5.1
+**Sürüm:** 0.5.2
 **Lisans:** MIT
 **Dağıtım:** `dist/Koppy.user.js` üzerinden Tampermonkey
 
@@ -18,7 +18,7 @@
 
 ## Doğrulama
 
-- Unit/DOM: 49 test
+- Unit/DOM: 50 test
 - Browser E2E: 13 test (gerçek PDF.js render, Turkcell-tipi küçük bağlantı ve yerel Picviewer belge önizlemesi dahil)
 - Bağımlılık denetimi: `npm audit --audit-level=high`
 
@@ -70,3 +70,4 @@
 - 0.5.0: Koppy Bridge eklendi. Tampermonkey sandbox’ı rastgele eşleme anahtarıyla yalnız loopback helper’ına framed PNG listesi yollar; helper her PNG’yi ayrı `NSPasteboardItem` olarak yazar. `npm run bridge:selftest` genel panoya dokunmadan adlandırılmış test panosunda 2 bağımsız PNG öğesini doğruladı; kurulu LaunchAgent sağlık endpoint’i `{"ok":true,"version":"0.5.0"}` döndü. Gerçek Zen→ChatGPT tek-yapıştırma kabulü henüz kullanıcı tarafından denenmedi.
 - Tampermonkey kurulum sayfası Zen'de arka planda açıldı. İlk kurulumdan sonra **Automatic installation** açık olmalıdır.
 - 0.5.1: Zen/Firefox Tampermonkey'nin `@connect *` altında loopback isteğini Bridge'e ulaşmadan kesebildiği canlı hata görüldü. Metadata'ya dar açık `@connect 127.0.0.1` ve `@connect localhost` izinleri eklendi; Bridge servisi sağlıklıydı ve hata anında hiç istek almamıştı.
+- 0.5.2: v0.5.1 canlı denemesinde Bridge logu yine boş kaldı. Loopback isteği eski callback GM API'sinden çıkmıyordu; Bridge artık Tampermonkey 5.5'in Firefox/Zen Promise tabanlı `GM.xmlHttpRequest` taşımasını önceliklendirir. Bu taşıma için unit testi eklendi.

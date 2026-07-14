@@ -39,3 +39,23 @@ test("Koppy Bridge refuses an invalid or oversized browser-side batch before net
     await assert.rejects(bridge.frameImages([{ blob: new Blob(["not-png"], { type: "image/jpeg" }) }, { blob: new Blob(["x"], { type: "image/png" }) }]), /yalnız hazırlanmış PNG/);
     await assert.rejects(bridge.frameImages([{ blob: new Blob(["x"], { type: "image/png" }) }]), /en az iki görsel/);
 });
+
+test("Koppy Bridge prefers Tampermonkey's modern Firefox transport", async t => {
+    const previous = global.GM;
+    t.after(() => {
+        if (previous === undefined) delete global.GM;
+        else global.GM = previous;
+    });
+    let modernCalls = 0;
+    global.GM = {
+        xmlHttpRequest(options) {
+            modernCalls += 1;
+            if (options.method === "GET") return Promise.resolve({ status: 200, responseText: JSON.stringify({ ok: true, token: "m".repeat(43) }) });
+            return Promise.resolve({ status: 200, responseText: JSON.stringify({ ok: true, count: 2 }) });
+        },
+    };
+    const bridge = KoppyBridge.create({ Blob, gmRequest() { throw new Error("legacy yol kullanılmamalı"); } });
+    const png = new Blob([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], { type: "image/png" });
+    assert.deepEqual(await bridge.writeImages([{ blob: png }, { blob: png }]), { count: 2 });
+    assert.equal(modernCalls, 2);
+});
