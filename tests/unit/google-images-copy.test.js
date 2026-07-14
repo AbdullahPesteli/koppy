@@ -270,7 +270,7 @@ test("Recent Copies retains normal Cmd+C results and accepts a later explicit ba
     });
     const stackEvents = [];
     controller.onStackChange(state => stackEvents.push(state));
-    assert.deepEqual(controller.getStackState(), { enabled: false, parked: false, count: 0, bytes: 0, ready: false, accepted: false, maxItems: 10, maxBytes: 150 * 1024 * 1024 });
+    assert.deepEqual(controller.getStackState(), { enabled: false, parked: false, count: 0, bytes: 0, ready: false, accepted: false, delivering: false, maxItems: 10, maxBytes: 150 * 1024 * 1024 });
     controller.setHoveredImage(image);
     const copy = await controller.copyHoveredImage({ key: "c", metaKey: true, target: dom.window.document.body, preventDefault() {}, stopImmediatePropagation() {} });
     const secondCopy = await controller.copyHoveredImage({ key: "c", metaKey: true, target: dom.window.document.body, preventDefault() {}, stopImmediatePropagation() {} });

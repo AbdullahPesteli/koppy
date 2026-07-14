@@ -1,6 +1,6 @@
 # Koppy — Durum
 
-**Sürüm:** 0.4.14
+**Sürüm:** 0.5.0
 **Lisans:** MIT
 **Dağıtım:** `dist/Koppy.user.js` üzerinden Tampermonkey
 
@@ -11,13 +11,14 @@
 - Kopyalama, mümkünse QuickHover'ın süzülen preview panelinde ince ilerleme çizgisi ve çözünürlüklü başarı bilgisi verir; küçük kaynak görsel yalnız ince hedef çerçevesi taşır. Metin kopyalamayı bozmaz.
 - QuickHover önizlemesi boş boyut ayarında ekranı kaplamak yerine yaklaşık ekranın %72'sine sığar; elle girilen sınır korunur.
 - Tampermonkey menüsündeki **Koppy Canlı Kontrol**, sık kullanılan modifier, FloatBar konumu ve preview boyutunu küçük bir panelden gerçek davranışa anında uygular. Panel üst sağda açılır, başlığından sürüklenebilir; **sabitle** açıkken sayfada deneme yaparken kapanmaz. Aynı paneldeki **Koppy’yi güncelle** eylemi Tampermonkey güncelleme sayfasını doğrudan açar.
+- **Koppy Bridge**, `▣ N` tıklanınca tutulan PNG'leri macOS panosuna ayrı native öğeler olarak yazar; başarı Bridge yanıtından sonra `N görsel panoda · tek ⌘V` diye bildirilir. LaunchAgent bu Mac'te kurulu; yalnız `127.0.0.1:47651` dinler, CORS vermez, web trafiğini/cookie'leri/panodaki mevcut veriyi okumaz ve 10 PNG / 150 MB sınırını uygular.
 - **Son Kopyalar**, normal `Cmd+C` sonucunu değiştirmez: her basış macOS panosuna yalnız son PNG’yi yazar, aynı PNG bu sekmede en fazla 10 görsel / 150 MB sınırında tutulur. İkinci kopyadan sonra mouse yanında `▣ N` rozeti görünür. Mouse ondan uzaklaşınca yumuşak companion takibi yapar; rozete doğru yönelince frenler, sabitlenir ve 44×36 px tıklanabilir hedefe dönüşür. Hover'da daha parlak, %10 büyük halo alır; mouse rozeti bırakır bırakmaz yeni mouse konumunun yanına geri gelir. Tıklandığında liste seçilir; çoklu görüntüyü ayrı native pano öğeleri olarak yazmak için hâlâ opt-in Koppy Bridge gerekir. Canlı Kontrol yalnız erişilebilir yedek olarak `Son N` ve `×` gösterir; `×` sistem panosuna dokunmaz.
 - Ayar arayüzü sandbox'lıdır; 91 mevcut Picviewer ayarının saklama sözleşmesini korur.
 - `@updateURL` / `@downloadURL` GitHub'daki sürüm dosyasına bağlıdır. Tampermonkey'de **Automatic installation** açık olmalıdır.
 
 ## Doğrulama
 
-- Unit/DOM: 47 test
+- Unit/DOM: 49 test
 - Browser E2E: 13 test (gerçek PDF.js render, Turkcell-tipi küçük bağlantı ve yerel Picviewer belge önizlemesi dahil)
 - Bağımlılık denetimi: `npm audit --audit-level=high`
 
@@ -66,4 +67,5 @@
 - 0.4.13: Yakalanan rozet hover'da daha belirgin hale gelir. Rozetten çıkış, eski konumda kalmak yerine pointerleave anında takip moduna geri döner; E2E bu geri dönüşü doğrular. Hata ve geçici bilgi toast'ları daraltılıp uzun URL/mesajlarda satır kırar.
 - 0.4.14: Rozete doğru yönelmek artık tek başına yakalama sayılmaz. Rozet önce kısa bir yaklaşma bekler; yalnız 110 ms gerçek hover'dan sonra seçim moduna girer. Casual mouse geçişi/uzaklaşması takip moduna döner; E2E hem false-catch çıkışını hem gerçek hover ile seçimi doğrular.
 - 2026-07-14 araştırması: macOS `NSPasteboard` birden fazla bağımsız öğe yazabilir; ancak web Clipboard API spesifikasyonu `write()` çağrısında son `ClipboardItem`'ı seçer, Firefox extension API'sinde de `additionalItems` yoktur. Bu nedenle sonradan karar verilen çoklu-görsel yapıştırma, Tampermonkey tek başına değil opt-in yerel Koppy Bridge ile gerçekçi ve doğrulanabilir bir yoldur.
+- 0.5.0: Koppy Bridge eklendi. Tampermonkey sandbox’ı rastgele eşleme anahtarıyla yalnız loopback helper’ına framed PNG listesi yollar; helper her PNG’yi ayrı `NSPasteboardItem` olarak yazar. `npm run bridge:selftest` genel panoya dokunmadan adlandırılmış test panosunda 2 bağımsız PNG öğesini doğruladı; kurulu LaunchAgent sağlık endpoint’i `{"ok":true,"version":"0.5.0"}` döndü. Gerçek Zen→ChatGPT tek-yapıştırma kabulü henüz kullanıcı tarafından denenmedi.
 - Tampermonkey kurulum sayfası Zen'de arka planda açıldı. İlk kurulumdan sonra **Automatic installation** açık olmalıdır.

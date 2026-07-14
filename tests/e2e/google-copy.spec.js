@@ -163,6 +163,7 @@ test("Recent Copies keeps normal clipboard behavior and exposes a magnetic, clic
                 return { promise: Promise.resolve({ blob: png }), abort() {} };
             },
             normalizeImage: async blob => ({ blob, width: 320, height: 180 }),
+            onRecentCopiesAccepted: () => ({ count: 2 }),
         });
         window.__stackController.start();
     });

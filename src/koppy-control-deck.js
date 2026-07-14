@@ -60,7 +60,7 @@
         let status;
         let isOpen = false;
         let closeTimer;
-        let statusMessage = "Son Kopyalar sessizce tutulur · ▣ rozetiyle seçilir";
+        let statusMessage = "Son Kopyalar tutulur · ▣ rozeti gerçek çoklu panoya yazar";
         let statusError = false;
         let isPinned = false;
         let drag;
@@ -128,12 +128,16 @@
                 : null;
             if (recentCopies) {
                 recentCopies.type = "button";
-                recentCopies.setAttribute("aria-label", "Son " + stackState.count + " kopyayı seç");
+                recentCopies.setAttribute("aria-label", "Son " + stackState.count + " görseli tek yapıştırma için panoya koy");
                 recentCopies.title = "Mouse yanındaki ▣ rozetiyle aynı işlem";
                 recentCopies.addEventListener("click", event => {
                     if (!isUserEvent(event)) return;
                     if (typeof settings.acceptRecentCopies === "function") stackState = settings.acceptRecentCopies() || stackState;
-                    setStatus("Son " + stackState.count + " kopya seçildi · çoklu pano Bridge ile gelir");
+                    setStatus(stackState.delivering
+                        ? "Son " + stackState.count + " görsel panoya aktarılıyor…"
+                        : stackState.accepted
+                            ? "Son " + stackState.count + " görsel panoda · tek ⌘V ile yapıştır"
+                            : "Son " + stackState.count + " görsel panoya hazırlanıyor…");
                     render();
                 });
             }

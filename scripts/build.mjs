@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const upstreamPath = path.join(root, "vendor/picviewer-ce-plus/Picviewer CE+.user.js");
 const modulePath = path.join(root, "src/google-images-copy.js");
+const bridgeModulePath = path.join(root, "src/koppy-bridge.js");
 const settingsModulePath = path.join(root, "src/koppy-settings-ui.js");
 const previewModulePath = path.join(root, "src/koppy-preview-fit.js");
 const controlDeckModulePath = path.join(root, "src/koppy-control-deck.js");
@@ -16,6 +17,7 @@ const marker = "        // 注册按键";
 
 let source = fs.readFileSync(upstreamPath, "utf8");
 const googleModuleSource = fs.readFileSync(modulePath, "utf8");
+const bridgeModuleSource = fs.readFileSync(bridgeModulePath, "utf8");
 const settingsModuleSource = fs.readFileSync(settingsModulePath, "utf8");
 const previewModuleSource = fs.readFileSync(previewModulePath, "utf8");
 const controlDeckModuleSource = fs.readFileSync(controlDeckModulePath, "utf8");
@@ -42,7 +44,7 @@ const moduleSource = `${settingsModuleSource}\n\n        globalThis.KoppySetting
             },
             onOpenState: () => { isConfigOpen = true; },
             onCloseState: () => { isConfigOpen = false; },
-});\n\n${controlDeckModuleSource}\n\n${previewModuleSource}\n\n${googleModuleSource}`;
+});\n\n${controlDeckModuleSource}\n\n${previewModuleSource}\n\n${bridgeModuleSource}\n\n${googleModuleSource}\n\n        const koppyBridge = globalThis.KoppyBridge.create({\n            gmRequest: _GM_xmlhttpRequest,\n            getValue: _GM_getValue,\n            setValue: _GM_setValue,\n            Blob: Blob,\n        });\n        const koppyCreateController = globalThis.KoppyGoogleCopy.createController;\n        globalThis.KoppyGoogleCopy.createController = dependencies => koppyCreateController(Object.assign({}, dependencies, {\n            onRecentCopiesAccepted: items => koppyBridge.writeImages(items),\n        }));`;
 const runtimeHashes = new Map(fs.readFileSync(path.join(runtimeDir, "SHA256SUMS"), "utf8").trim().split("\n").map(line => {
     const match = line.match(/^([0-9a-f]{64})\s+(.+)$/);
     if (!match) throw new Error(`Invalid runtime hash line: ${line}`);
@@ -71,7 +73,7 @@ const replacements = new Map([
     ["// @name:pt-BR           Picviewer CE+", "// @name:pt-BR           Koppy"],
     ["// @name:ru              Picviewer CE+", "// @name:ru              Koppy"],
     ["// @author               NLF && ywzhaiqi && hoothin", "// @author               NLF && ywzhaiqi && hoothin; Koppy fork by pestly"],
-    ["// @version              2026.2.6.1", "// @version              0.4.14"],
+    ["// @version              2026.2.6.1", "// @version              0.5.0"],
     ["// @namespace            https://github.com/hoothin/UserScripts", "// @namespace            https://github.com/AbdullahPesteli/koppy"],
     ["// @homepage             https://pv.hoothin.com/", "// @homepage             https://github.com/AbdullahPesteli/koppy"],
     ["// @supportURL           https://github.com/hoothin/UserScripts/issues", "// @supportURL           https://github.com/AbdullahPesteli/koppy/issues"],
@@ -281,6 +283,9 @@ if (!source.includes(openPrefsSecureEntry)) throw new Error("Upstream openPrefs 
 source = source.replace(openPrefsSecureEntry, openPrefsSecureEntry
     + "\n            globalThis.KoppySettingsUI.openSecure();\n            return;");
 const integration = `${moduleSource}\n\n        let koppyDocumentPreview = null;\n        let koppyDocumentPreviewUrl = null;\n        const koppyHideDocumentPreview = () => {\n            const preview = koppyDocumentPreview;\n            koppyDocumentPreview = null;\n            if (preview && !preview.removed) preview.remove();\n            if (koppyDocumentPreviewUrl) {\n                URL.revokeObjectURL(koppyDocumentPreviewUrl);\n                koppyDocumentPreviewUrl = null;\n            }\n            if (uniqueImgWin === preview || (uniqueImgWin && uniqueImgWin.removed)) uniqueImgWin = null;\n        };\n        const koppyShowDocumentPreview = ({ blob, element, pointer }) => {\n            if (!blob || !element || !pointer || typeof URL.createObjectURL !== "function") return false;\n            koppyHideDocumentPreview();\n            const url = URL.createObjectURL(blob);\n            const previewImage = document.createElement("img");\n            const data = { src: url, imgSrc: url, img: element, type: "koppy-document", noActual: true };\n            uniqueImgWinInitX = pointer.x;\n            uniqueImgWinInitY = pointer.y;\n            const preview = new ImgWindowC(previewImage, data, null, null, true);\n            koppyDocumentPreview = preview;\n            koppyDocumentPreviewUrl = url;\n            preview.imgWindow.classList.add("preview");\n            preview.imgWindow.dataset.koppyDocumentPreview = "true";\n            preview.imgWindow.addEventListener("pv-removeImgWindow", () => {\n                if (koppyDocumentPreview === preview) koppyDocumentPreview = null;\n                if (koppyDocumentPreviewUrl === url) {\n                    URL.revokeObjectURL(url);\n                    koppyDocumentPreviewUrl = null;\n                }\n                if (uniqueImgWin === preview) uniqueImgWin = null;\n            }, { once: true });\n            uniqueImgWin = preview;\n            return true;\n        };\n        globalThis.KoppyGoogleCopy.createController({\n            document: document,\n            window: window,\n            location: location,\n            navigator: navigator,\n            ClipboardItem: typeof ClipboardItem === "undefined" ? null : ClipboardItem,\n            gmRequest: _GM_xmlhttpRequest,\n            resolvePic: findPic,\n            isPreviewGesture: event => checkPreview(event),\n            showDocumentPreview: koppyShowDocumentPreview,\n            hideDocumentPreview: koppyHideDocumentPreview,\n        }).start();\n        globalThis.KoppyPreviewFit.install({ ImgWindowC: ImgWindowC, prefs: prefs, window: window });\n\n`;
+const bridgeValueAliases = `        const _GM_getValue = typeof GM_getValue === "function" ? GM_getValue : () => null;
+        const _GM_setValue = typeof GM_setValue === "function" ? GM_setValue : () => {};
+`;
 const controlDeckIntegration = `        const koppyOpenUpdate = () => _GM_openInTab(${JSON.stringify(updateUrl)}, {active:true});
         const koppyControlDeck = globalThis.KoppyControlDeck.install({
             config: GM_config,
@@ -300,7 +305,7 @@ const controlDeckIntegration = `        const koppyOpenUpdate = () => _GM_openIn
         _GM_registerMenuCommand("Koppy · Güncellemeyi aç", koppyOpenUpdate);
 
 `;
-source = source.replace(marker, integration + controlDeckIntegration + marker);
+source = source.replace(marker, bridgeValueAliases + integration + controlDeckIntegration + marker);
 
 fs.mkdirSync(outputDir, { recursive: true });
 fs.writeFileSync(outputPath, source);

@@ -41,9 +41,15 @@ input/textarea/contenteditable alanındayken normal kopyalama davranışı korun
 **Son Kopyalar** normal `⌘C` akışını değiştirmez: her başarılı kopya macOS panosuna yine yalnız son PNG'yi
 yazar, ayrıca bu sekmede en fazla 10 görsel / 150 MB olarak tutulur. İkinci görselden itibaren mouse yanında
 küçük `▣ N` rozeti belirir. Mouse ondan uzaklaşınca yumuşakça companion gibi takip eder; rozete doğru
-yönelince frenleyip geniş, tıklanabilir bir hedef olur. Tek tık, son kopyaları seçer. `×` yalnız Koppy'nin
-geçici belleğini temizler, sistem panosuna dokunmaz. Çoklu resmi gerçekten ayrı pano öğeleri olarak yazmak
-tarayıcının değil, ilerideki opt-in Koppy Bridge'in işidir.
+yönelince frenleyip geniş, tıklanabilir bir hedef olur. Tek tık, son kopyaları gerçek macOS panosuna ayrı
+öğeler olarak yazar; ardından ChatGPT gibi bir alana tek ⌘V ile yapıştırılır. `×` yalnız Koppy'nin
+geçici belleğini temizler, sistem panosuna dokunmaz.
+
+Bu özellik için bir defa yerel **Koppy Bridge** kurulur. Bridge yalnız `127.0.0.1` üzerinde dinler; rastgele
+eşleme anahtarı Tampermonkey'nin izole alanında saklanır, web sayfalarına CORS izni veya pano okuma yetkisi
+verilmez. Bu Mac'te Bridge kurulu ve çalışır haldedir. Başka bir Mac'te kaynak klasöründe `npm run bridge:install`
+komutu yeterlidir. Bridge sadece çoklu seçim rozeti tıklandığında panoya **yazar**; site trafiğini, cookie'leri,
+URL'leri veya mevcut panodaki içeriği okumaz. Her aktarım en fazla 10 PNG / 150 MB ile sınırlıdır.
 
 Hover yalnız URL adayını çözer; ağ/decode işlemi `Cmd+C` öncesinde başlamaz. Google'da Koppy, Picviewer'ın
 çözdüğü kaynakla birlikte bağlantı parametreleri, güncel metadata, lazy-load alanları, `picture`/`srcset` ve
@@ -88,10 +94,13 @@ npm run build
 npm test
 npm run test:e2e
 npm run clipboard:inspect
+npm run bridge:selftest
 ```
 
 - `vendor/picviewer-ce-plus/`: değiştirilmemiş upstream snapshot
 - `src/google-images-copy.js`: Koppy'nin test edilebilir Cmd+C çekirdeği
+- `src/koppy-bridge.js`: Tampermonkey sandbox'ından loopback Bridge'e güvenli çoklu PNG aktarımı
+- `bridge/KoppyBridge.swift`: macOS NSPasteboard çoklu-öğe helper'ı ve LaunchAgent şablonu
 - `src/koppy-control-deck.js`: küçük, canlı FloatBar/preview kontrol paneli
 - `src/koppy-settings-ui.js`: Koppy ayar sunum katmanı
 - `DESIGN.md`: arayüz tokenları, layout ve etkileşim sözleşmesi

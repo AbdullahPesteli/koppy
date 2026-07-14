@@ -1,6 +1,6 @@
 {
   "name": "koppy",
-  "version": "0.4.14",
+  "version": "0.5.0",
   "description": "Koppy: Google Images direct-image clipboard fork of Picviewer CE+ for Tampermonkey",
   "license": "MIT",
   "repository": {
@@ -14,6 +14,8 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "clipboard:inspect": "swift scripts/clipboard-inspect.swift",
+    "bridge:install": "zsh scripts/install-bridge.sh",
+    "bridge:selftest": "swiftc bridge/KoppyBridge.swift -framework AppKit -framework Security -o .context/KoppyBridge-selftest && .context/KoppyBridge-selftest --self-test",
     "test": "node --test tests/unit/*.test.js",
     "test:e2e": "playwright test",
     "check": "npm run build && npm test && npm run test:e2e"

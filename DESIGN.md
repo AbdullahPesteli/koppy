@@ -51,8 +51,9 @@ Koppy, görsel işi sırasında arka planda güvenilir kalan kişisel bir araçt
   Yalnız yaklaşmak yakalama değildir: rozet önce kısa bir yaklaşma durumuna girer, gerçek hover 110 ms sürerse
   %10 büyür ve parlaklaşır. Casual geçişte pointerleave/uzaklaşma anında eski noktada beklemeden yeni imleç
   konumuna companion olarak döner.
-  Böylece hem companion hissi verir hem de kaçan buton olmaz. Tıklama, sonraki Bridge katmanına teslim edilmek
-  üzere listeyi seçer. Reduced-motion'da rozet doğrudan konum değiştirir.
+  Böylece hem companion hissi verir hem de kaçan buton olmaz. Tıklama, Bridge'e gerçek pano yazımı başlatır:
+  aktarım sürerken kısa durum, başarılıysa `N görsel panoda · tek ⌘V` sonucu görünür. Reduced-motion'da rozet
+  doğrudan konum değiştirir.
 - Canlı Kontrol yalnız açık olduğunda `Son N` ve `×` gösterir; bu alternatif bir karar paneli değil, aynı
   rozetin erişilebilir yedeğidir. `×` yalnız geçici belleği temizler ve sistem panosunu değiştirmez.
 - Tampermonkey menüsünden açılan **Canlı Kontrol**, tam ayar penceresinin yerine geçen ikinci bir form değildir:

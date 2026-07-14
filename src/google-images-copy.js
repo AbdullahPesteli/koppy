@@ -1325,6 +1325,7 @@
             items: [],
             bytes: 0,
             accepted: false,
+            delivering: false,
             listeners: new Set(),
         };
         const stackCursor = createStackCursorCollector(documentLike, windowLike, { onAccept: acceptStack });
@@ -1339,6 +1340,7 @@
                 bytes: stack.bytes,
                 ready: stack.items.length >= 2,
                 accepted: stack.accepted,
+                delivering: stack.delivering,
                 maxItems: MAX_STACK_ITEMS,
                 maxBytes: MAX_STACK_BYTES,
             };
@@ -1359,6 +1361,7 @@
             stack.items = [];
             stack.bytes = 0;
             stack.accepted = false;
+            stack.delivering = false;
             stackCursor.hide();
             return emitStackChange();
         }
@@ -1385,18 +1388,51 @@
             });
             stack.bytes += bytes;
             stack.accepted = false;
+            stack.delivering = false;
             return { added: true, evicted, state: emitStackChange() };
         }
 
         function acceptStack() {
             if (stack.items.length < 2) return stackState();
-            stack.accepted = true;
-            const state = emitStackChange();
             stackCursor.capture();
-            if (typeof deps.onRecentCopiesAccepted === "function") {
-                try { deps.onRecentCopiesAccepted(stack.items.slice(), state); } catch (_) {}
+            if (typeof deps.onRecentCopiesAccepted !== "function") {
+                notify("Koppy Bridge: yerel pano yardımcısı kurulu değil", "error");
+                return stackState();
             }
-            return state;
+            let output;
+            try {
+                output = deps.onRecentCopiesAccepted(stack.items.slice(), stackState());
+            } catch (cause) {
+                const message = cause && cause.message || "çoklu pano yazımı başlatılamadı";
+                notify("Koppy: " + message, "error");
+                return stackState();
+            }
+            if (!output || typeof output.then !== "function") {
+                stack.accepted = true;
+                stack.delivering = false;
+                const state = emitStackChange();
+                notify(state.count + " görsel panoda · tek ⌘V ile yapıştır", "success");
+                return state;
+            }
+            stack.accepted = false;
+            stack.delivering = true;
+            const pending = emitStackChange();
+            notify(pending.count + " görsel gerçek panoya aktarılıyor…", "progress");
+            return output.then(result => {
+                stack.delivering = false;
+                stack.accepted = true;
+                const state = emitStackChange();
+                const count = Number(result && result.count) || state.count;
+                notify(count + " görsel panoda · tek ⌘V ile yapıştır", "success");
+                return state;
+            }).catch(cause => {
+                stack.delivering = false;
+                stack.accepted = false;
+                const state = emitStackChange();
+                const message = cause && cause.message || "çoklu pano yazılamadı";
+                notify("Koppy: " + message, "error");
+                return Object.assign({ failed: true, error: message }, state);
+            });
         }
 
         function cancelState(state) {
