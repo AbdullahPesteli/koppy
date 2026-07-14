@@ -677,6 +677,34 @@
         return { blob: await canvasToPng(output.canvas, environment), width, height };
     }
 
+    async function svgImageToPng(blob, environment) {
+        const env = environment || {};
+        const documentLike = env.document;
+        const ImageCtor = env.Image || (documentLike && documentLike.defaultView && documentLike.defaultView.Image);
+        const UrlCtor = env.URL || (typeof URL === "function" ? URL : null);
+        if (!ImageCtor || !UrlCtor || typeof UrlCtor.createObjectURL !== "function" || typeof UrlCtor.revokeObjectURL !== "function") {
+            throw new Error("Tarayıcı SVG dönüştürme yüzeyini desteklemiyor");
+        }
+        const objectUrl = UrlCtor.createObjectURL(blob);
+        let image;
+        try {
+            image = await new Promise((resolve, reject) => {
+                const candidate = new ImageCtor();
+                candidate.onload = () => resolve(candidate);
+                candidate.onerror = () => reject(new Error("SVG görsel olarak yüklenemedi"));
+                candidate.src = objectUrl;
+            });
+            const width = Number(image.naturalWidth || image.width || 0);
+            const height = Number(image.naturalHeight || image.height || 0);
+            validateImageDimensions(width, height, env);
+            const output = createOutputCanvas(width, height, env);
+            output.context.drawImage(image, 0, 0, width, height);
+            return { blob: await canvasToPng(output.canvas, env), width, height };
+        } finally {
+            UrlCtor.revokeObjectURL(objectUrl);
+        }
+    }
+
     async function normalizeImageToPng(blob, environment) {
         const env = environment || {};
         const probeDimensions = env.probeDimensions || probeRasterDimensions;
@@ -692,6 +720,19 @@
             if (!["image/avif", "image/x-icon", "image/vnd.microsoft.icon", "image/svg+xml", "image/heic"].includes(detected.mime)) throw error;
         }
         const createBitmap = env.createImageBitmap || (typeof createImageBitmap === "function" ? createImageBitmap : null);
+        // Firefox/Zen can fetch an SVG but rejects it in createImageBitmap().
+        // A blob URL loaded in an <img> is still same-origin to this isolated
+        // userscript and lets the canvas produce the clipboard's PNG format.
+        if (detected.mime === "image/svg+xml") {
+            if (createBitmap) {
+                try {
+                    const bitmap = await createBitmap(normalizedInput);
+                    try { return await imageBitmapToPng(bitmap, env); }
+                    finally { if (typeof bitmap.close === "function") bitmap.close(); }
+                } catch (_) {}
+            }
+            return svgImageToPng(normalizedInput, env);
+        }
         if (!createBitmap) throw new Error("Tarayıcı görsel çözücüsü kullanılamıyor");
         let bitmap;
         try {
@@ -1312,6 +1353,7 @@
             document: documentLike,
             Worker: windowLike && windowLike.Worker,
             URL: windowLike && windowLike.URL,
+            Image: windowLike && windowLike.Image,
             Blob: windowLike && windowLike.Blob,
             pdfjsLib: deps.pdfjsLib,
             pdfModuleSource: deps.pdfModuleSource,

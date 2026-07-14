@@ -1,6 +1,6 @@
 # Koppy — Durum
 
-**Sürüm:** 0.5.3
+**Sürüm:** 0.5.4
 **Lisans:** MIT
 **Dağıtım:** `dist/Koppy.user.js` üzerinden Tampermonkey
 
@@ -73,3 +73,4 @@
 - 0.5.1: Zen/Firefox Tampermonkey'nin `@connect *` altında loopback isteğini Bridge'e ulaşmadan kesebildiği canlı hata görüldü. Metadata'ya dar açık `@connect 127.0.0.1` ve `@connect localhost` izinleri eklendi; Bridge servisi sağlıklıydı ve hata anında hiç istek almamıştı.
 - 0.5.2: v0.5.1 canlı denemesinde Bridge logu yine boş kaldı. Loopback isteği eski callback GM API'sinden çıkmıyordu; Bridge artık Tampermonkey 5.5'in Firefox/Zen Promise tabanlı `GM.xmlHttpRequest` taşımasını önceliklendirir. Bu taşıma için unit testi eklendi.
 - 0.5.3: Yerel Tanı Beyni eklendi. Kopya aday çözümü, indirme/decode, Clipboard API ve Bridge taşıması ayrı olaylarla; hiçbir URL/token/pano içeriği tutmadan kayda geçer. Bridge, inbound istekleri/HTTP sonucunu redakte ve boyut sınırlı yerel günlüğe yazar; health yanıtında son durum görünür. Ulaşılamayan Bridge için bir health + tek yeniden deneme ile güvenli oto-toparlama yapılır. Canlı Zen doğrulaması bu sürüm yüklendikten sonra beklenir.
+- 0.5.4: Firefox/Zen'in `createImageBitmap()` ile çözemediği `image/svg+xml` için blob-URL `<img>` → canvas → `image/png` fallback'i eklendi. SVG bitmap reddi fixture'ı bu yolu ve geçici URL'nin bırakılmasını doğrular.

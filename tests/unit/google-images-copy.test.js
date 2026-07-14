@@ -443,6 +443,32 @@ test("PNG is preserved, JPEG/WebP are converted, and pixel bombs are rejected", 
     assert.equal(hugeDecodeStarted, false);
 });
 
+test("SVG falls back from Firefox createImageBitmap to a blob-backed image canvas", async () => {
+    class FakeCanvas {
+        constructor(width, height) { this.width = width; this.height = height; }
+        getContext() { return { drawImage() {} }; }
+        async convertToBlob() { return new Blob(["svg-png"], { type: "image/png" }); }
+    }
+    let revoked = null;
+    class FakeImage {
+        constructor() { this.naturalWidth = 960; this.naturalHeight = 540; }
+        set src(value) { this.value = value; queueMicrotask(() => this.onload()); }
+    }
+    const result = await Koppy.normalizeImageToPng(new Blob([
+        '<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540"><rect width="100%" height="100%"/></svg>',
+    ], { type: "image/svg+xml" }), {
+        createImageBitmap: async () => { throw new Error("Firefox SVG bitmap unsupported"); },
+        Image: FakeImage,
+        URL: {
+            createObjectURL() { return "blob:koppy-svg"; },
+            revokeObjectURL(value) { revoked = value; },
+        },
+        OffscreenCanvas: FakeCanvas,
+    });
+    assert.deepEqual([result.width, result.height, result.blob.type], [960, 540, "image/png"]);
+    assert.equal(revoked, "blob:koppy-svg");
+});
+
 test("file signatures recognize browser images, PDF-compatible AI and legacy AI/EPS separately", async () => {
     const gif = new Uint8Array(10);
     gif.set(Buffer.from("GIF89a"));
