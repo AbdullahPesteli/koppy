@@ -218,6 +218,11 @@ test("Recent Copies keeps normal clipboard behavior and exposes a magnetic, clic
     await expect.poll(() => page.evaluate(() => document.querySelector("#koppy-stack-cursor").style.pointerEvents)).toBe("auto");
     await page.locator("#koppy-stack-cursor").click();
     await expect.poll(() => page.evaluate(() => window.__stackController.getStackState().accepted)).toBe(true);
+    const captured = await page.locator("#koppy-stack-cursor").boundingBox();
+    const releasePoint = { x: Math.round(captured.x + captured.width + 140), y: Math.round(captured.y + captured.height / 2) };
+    await page.mouse.move(releasePoint.x, releasePoint.y);
+    await expect.poll(() => page.evaluate(() => document.querySelector("#koppy-stack-cursor").style.pointerEvents)).toBe("none");
+    await expect.poll(() => page.evaluate(() => document.querySelector("#koppy-stack-cursor").style.left)).toBe((releasePoint.x + 34) + "px");
     fs.mkdirSync(path.resolve("test-results"), { recursive: true });
     await page.screenshot({ path: "test-results/koppy-stack-feedback.png" });
 

@@ -48,6 +48,7 @@ Koppy, görsel işi sırasında arka planda güvenilir kalan kişisel bir araçt
 - Son Kopyalar görünmez varsayılandır: normal başarı çizgisi/mesajı liste bilgisi taşımaz. İkinci başarılı
   kopyadan sonra imleç yanında yalnız `▣ N` rozeti görünür. Rozet, imleç uzaklaşırken hafif gecikmeli takip eder;
   imleç ona doğru yönelince frenleyip dünya koordinatında sabitlenir, 44×36 px hedefe ve hafif bir halo'ya dönüşür.
+  Gerçek hover'da %10 büyür ve parlaklaşır; pointerleave anında eski noktada beklemeden yeni imleç konumuna companion olarak döner.
   Böylece hem companion hissi verir hem de kaçan buton olmaz. Tıklama, sonraki Bridge katmanına teslim edilmek
   üzere listeyi seçer. Reduced-motion'da rozet doğrudan konum değiştirir.
 - Canlı Kontrol yalnız açık olduğunda `Son N` ve `×` gösterir; bu alternatif bir karar paneli değil, aynı

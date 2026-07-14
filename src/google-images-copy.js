@@ -879,8 +879,11 @@
                     font: "600 13px/1.35 -apple-system, BlinkMacSystemFont, sans-serif",
                     boxShadow: "0 8px 30px rgba(0,0,0,.28)",
                     pointerEvents: "none",
-                    maxWidth: "min(86vw, 560px)",
+                    boxSizing: "border-box",
+                    maxWidth: "min(86vw, 440px)",
                     textAlign: "center",
+                    overflowWrap: "anywhere",
+                    wordBreak: "break-word",
                 });
                 documentLike.documentElement.appendChild(toast);
             }
@@ -1078,6 +1081,8 @@
         let lastPointer = null;
         let mode = "follow";
         let visibleCount = 0;
+        let hovered = false;
+        let selectionTimer;
 
         function reducedMotion() {
             return Boolean(win && typeof win.matchMedia === "function" && win.matchMedia("(prefers-reduced-motion: reduce)").matches);
@@ -1099,10 +1104,21 @@
             });
             label = doc.createElement("span");
             root.appendChild(label);
+            root.addEventListener("pointerenter", () => {
+                hovered = true;
+                updateVisual();
+            });
+            root.addEventListener("pointerleave", event => {
+                hovered = false;
+                // A captured badge must never strand itself at its old world
+                // position. Leaving it explicitly hands control back to follow.
+                releaseToFollow({ x: event.clientX, y: event.clientY });
+            });
             root.addEventListener("click", event => {
                 if (mode !== "capture" || !visibleCount || typeof onAccept !== "function") return;
                 event.preventDefault();
                 onAccept(visibleCount);
+                acknowledgeSelection();
             });
             doc.documentElement.appendChild(root);
             return root;
@@ -1121,9 +1137,10 @@
             const captured = mode === "capture";
             root.style.pointerEvents = captured ? "auto" : "none";
             root.style.cursor = captured ? "pointer" : "default";
-            root.style.transform = "translate(-50%, -50%) scale(" + (captured ? "1" : ".92") + ")";
-            root.style.borderColor = captured ? "rgba(173,194,255,.98)" : "rgba(124,156,255,.72)";
-            root.style.boxShadow = captured ? "0 0 0 5px rgba(124,156,255,.17), 0 7px 20px rgba(0,0,0,.30)" : "0 5px 16px rgba(0,0,0,.25)";
+            root.style.transform = "translate(-50%, -50%) scale(" + (captured ? (hovered ? "1.1" : "1") : ".92") + ")";
+            root.style.borderColor = captured ? (hovered ? "rgba(221,229,255,1)" : "rgba(173,194,255,.98)") : "rgba(124,156,255,.72)";
+            root.style.background = captured && hovered ? "rgba(66,91,149,.98)" : "rgba(38,53,87,.94)";
+            root.style.boxShadow = captured ? "0 0 0 " + (hovered ? "7" : "5") + "px rgba(124,156,255,.17), 0 7px 20px rgba(0,0,0,.30)" : "0 5px 16px rgba(0,0,0,.25)";
         }
 
         function show(pointer, count) {
@@ -1131,7 +1148,7 @@
             const item = ensure();
             if (!item) return;
             visibleCount = Number(count) || 0;
-            label.textContent = "▣ " + visibleCount;
+            if (!selectionTimer) label.textContent = "▣ " + visibleCount;
             item.setAttribute("aria-label", visibleCount + " son kopyayı seç");
             if (!companion) companion = { x: Number(pointer.x) + 34, y: Number(pointer.y) + 28 };
             place(companion);
@@ -1148,6 +1165,9 @@
             lastPointer = null;
             visibleCount = 0;
             mode = "follow";
+            hovered = false;
+            clearTimeout(selectionTimer);
+            selectionTimer = null;
         }
 
         function movingToward(pointer) {
@@ -1166,14 +1186,38 @@
             return velocityX * toBadgeX + velocityY * toBadgeY > speed * distance * .32;
         }
 
+        function releaseToFollow(pointer) {
+            if (!companion || !pointer) return;
+            mode = "follow";
+            const nextPointer = { x: Number(pointer.x) || 0, y: Number(pointer.y) || 0 };
+            // Snap the virtual spring near the exit point. The next document
+            // pointermove continues the companion motion without a dead zone.
+            companion.x = nextPointer.x + 34;
+            companion.y = nextPointer.y + 28;
+            lastPointer = nextPointer;
+            place(companion);
+            updateVisual();
+        }
+
+        function acknowledgeSelection() {
+            if (!root || !label) return;
+            clearTimeout(selectionTimer);
+            label.textContent = "✓ " + visibleCount;
+            root.style.background = "rgba(31,112,73,.98)";
+            selectionTimer = setTimeout(() => {
+                selectionTimer = null;
+                if (!label) return;
+                label.textContent = "▣ " + visibleCount;
+                updateVisual();
+            }, reducedMotion() ? 0 : 850);
+        }
+
         function move(pointer, state) {
             if (!state || Number(state.count) < 2) return hide();
             show(pointer, state.count);
             if (!root || !companion) return;
             const nextPointer = { x: Number(pointer.x) || 0, y: Number(pointer.y) || 0 };
-            const distance = Math.hypot(companion.x - nextPointer.x, companion.y - nextPointer.y);
             if (mode === "follow" && movingToward(nextPointer)) mode = "capture";
-            else if (mode === "capture" && distance > 132) mode = "follow";
             if (mode === "follow") {
                 const target = { x: nextPointer.x + 34, y: nextPointer.y + 28 };
                 const strength = reducedMotion() ? 1 : .42;
@@ -1319,8 +1363,6 @@
             stackCursor.capture();
             if (typeof deps.onRecentCopiesAccepted === "function") {
                 try { deps.onRecentCopiesAccepted(stack.items.slice(), state); } catch (_) {}
-            } else {
-                notify("Son " + state.count + " kopya seçildi · çoklu pano için Koppy Bridge gerekiyor", "progress");
             }
             return state;
         }
