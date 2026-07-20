@@ -15,6 +15,8 @@ function makeConfig(prefs) {
     const names = [
         "floatBar.position", "floatBar.previewMaxSizeW", "floatBar.previewMaxSizeH",
         "floatBar.globalkeys.ctrl", "floatBar.globalkeys.alt", "floatBar.globalkeys.shift", "floatBar.globalkeys.command",
+        "floatBar.globalkeys.previewFollowMouse", "floatBar.globalkeys.closeAfterPreview",
+        "floatBar.showDelay", "floatBar.hideDelay", "floatBar.stayOut",
     ];
     const fields = Object.fromEntries(names.map(name => [name, { value: null }]));
     return {
@@ -39,7 +41,8 @@ test("live control deck keeps a single modifier and persists choices immediately
             position: "top right",
             previewMaxSizeW: 0,
             previewMaxSizeH: 0,
-            globalkeys: { ctrl: true, alt: false, shift: false, command: false },
+            showDelay: 100, hideDelay: 566, stayOut: false,
+            globalkeys: { ctrl: true, alt: false, shift: false, command: false, previewFollowMouse: true, closeAfterPreview: true },
         },
     };
     const config = makeConfig(prefs);
@@ -58,10 +61,13 @@ test("live control deck keeps a single modifier and persists choices immediately
     assert.ok(root.querySelector(".panel.open"));
 
     root.querySelector('button[aria-label="Command ile önizleme"]').click();
-    assert.deepEqual(prefs.floatBar.globalkeys, { ctrl: false, alt: false, shift: false, command: true });
+    assert.equal(prefs.floatBar.globalkeys.command, true);
+    assert.equal(prefs.floatBar.globalkeys.ctrl, false);
     assert.equal(config.saves, 1);
 
-    root.querySelector('button[aria-label="Sol alt"]').click();
+    const position = root.querySelector(".position-select");
+    position.value = "bottom left";
+    position.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
     assert.equal(prefs.floatBar.position, "bottom left");
     assert.equal(repositioned, 1);
 

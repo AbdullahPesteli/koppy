@@ -75,7 +75,7 @@ const replacements = new Map([
     ["// @name:pt-BR           Picviewer CE+", "// @name:pt-BR           Koppy"],
     ["// @name:ru              Picviewer CE+", "// @name:ru              Koppy"],
     ["// @author               NLF && ywzhaiqi && hoothin", "// @author               NLF && ywzhaiqi && hoothin; Koppy fork by pestly"],
-    ["// @version              2026.2.6.1", "// @version              0.5.7"],
+    ["// @version              2026.2.6.1", "// @version              0.5.8"],
     ["// @namespace            https://github.com/hoothin/UserScripts", "// @namespace            https://github.com/AbdullahPesteli/koppy"],
     ["// @homepage             https://pv.hoothin.com/", "// @homepage             https://github.com/AbdullahPesteli/koppy"],
     ["// @supportURL           https://github.com/hoothin/UserScripts/issues", "// @supportURL           https://github.com/AbdullahPesteli/koppy/issues"],
@@ -335,7 +335,7 @@ const controlDeckIntegration = `        const koppyOpenUpdate = () => _GM_openIn
             storage.setListItem("hideIcon", location.hostname, hideIcon);
             if (hideIcon) document.head.appendChild(hideIconStyle);
             else if (hideIconStyle.parentNode) hideIconStyle.parentNode.removeChild(hideIconStyle);
-            return hideIcon;
+            return { hidden: hideIcon };
         };
         const koppyIsFloatBarHidden = () => Boolean(hideIcon);
         const koppyToggleShortcuts = () => {
@@ -344,7 +344,7 @@ const controlDeckIntegration = `        const koppyOpenUpdate = () => _GM_openIn
             const list = normalizeDisableKeySites(prefs.floatBar.disableKeySites);
             const disabled = list.indexOf(pattern) === -1;
             saveDisableKeySites(disabled ? [pattern].concat(list) : list.filter(item => item !== pattern));
-            return disabled;
+            return { disabled: disabled };
         };
         const koppyAreShortcutsDisabled = () => {
             const originPattern = location.origin.replace(/^https?/, "https?").replace(/\\./g, "\\\\.");

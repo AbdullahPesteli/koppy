@@ -1,6 +1,6 @@
 # Koppy — Durum
 
-**Sürüm:** 0.5.7
+**Sürüm:** 0.5.8
 **Lisans:** MIT
 **Dağıtım:** `dist/Koppy.user.js` üzerinden Tampermonkey
 
@@ -78,3 +78,4 @@
 - 0.5.5: Kopya geri bildirimi artık ilişkisiz açık QuickHover penceresine sıçramaz; gerçek kaynak görselin üzerinde kalır. Son Kopyalar aynı kaynak/ebat yeniden denendiğinde şişmez, normal pano kopyası yine yapılır. 18 px üzerindeki küçük gerçek görseller de hedef olur. Tarayıcıdaki yalnız terminal, redakte tanı olayları eşlenmiş loopback Bridge günlüğüne aktarılır; böylece sonraki hata yerelden doğrudan ayrıştırılabilir.
 - 0.5.6: Bridge modülünün hata etiketi ana sürümle hizalandı. Zen/Tampermonkey'de modern `GM.xmlHttpRequest` loopback'e ulaşamazsa, aynı sınırlı isteği callback tabanlı `GM_xmlhttpRequest` ile bir kez yeniden dener; böylece iki Tampermonkey taşıması da kullanılır.
 - 0.5.7: Düz Google arama sonuçlarındaki 92×92 gömülü `data:image` ürün önizlemeleri artık dış URL beklenmeden yalnız yerelde çözülüp PNG olarak kopyalanır; görünür önizleme olduğu açıkça etiketlenir. Tampermonkey'nin düz menüsü de tek Kontrol Merkezi girişine indirildi.
+- 0.5.8: Kontrol Merkezi, tek uzun ayar listesi yerine **Kontrol / Davranış / Araçlar** bölümlerine ayrıldı. Günlük preview, hover ve site araçları görünür; koordinat, eşik, indirme, sır ve özel kural gibi riskli ayrıntılar ayrı ayarlar ekranında kalır. Bridge hata etiketi ana sürümle tekrar hizalandı.

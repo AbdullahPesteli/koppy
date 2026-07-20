@@ -12,12 +12,15 @@ test("live control deck applies a single modifier, repositions an active bar and
         const prefs = window.__deckPrefs = {
             floatBar: {
                 position: "top right", previewMaxSizeW: 0, previewMaxSizeH: 0,
-                globalkeys: { ctrl: true, alt: false, shift: false, command: false },
+                showDelay: 100, hideDelay: 566, stayOut: false,
+                globalkeys: { ctrl: true, alt: false, shift: false, command: false, previewFollowMouse: true, closeAfterPreview: true },
             },
         };
         const names = [
             "floatBar.position", "floatBar.previewMaxSizeW", "floatBar.previewMaxSizeH",
             "floatBar.globalkeys.ctrl", "floatBar.globalkeys.alt", "floatBar.globalkeys.shift", "floatBar.globalkeys.command",
+            "floatBar.globalkeys.previewFollowMouse", "floatBar.globalkeys.closeAfterPreview",
+            "floatBar.showDelay", "floatBar.hideDelay", "floatBar.stayOut",
         ];
         const setPath = (target, path, value) => {
             const keys = path.split("."); const last = keys.pop(); let current = target;
@@ -32,7 +35,7 @@ test("live control deck applies a single modifier, repositions an active bar and
         window.__stack = { enabled: false, count: 0, bytes: 0, ready: false, accepted: false, maxItems: 10, maxBytes: 150 * 1024 * 1024 };
         let stackListener;
         window.__deck = window.KoppyControlDeck.install({
-            document, window, config, prefs,
+            document, window, config, prefs, requireTrusted: false,
             getFloatBar: () => ({ shown: true, data: {}, setPosition() { window.__repositions += 1; } }),
             openUpdate: () => { window.__updates = (window.__updates || 0) + 1; return true; },
             openGallery: () => {
@@ -40,10 +43,18 @@ test("live control deck applies a single modifier, repositions an active bar and
                 return Promise.resolve(window.__gallery === 1 ? { opened: true } : false);
             },
             openStitcher: () => { window.__stitch = (window.__stitch || 0) + 1; return true; },
-            toggleFloatBar: () => { window.__floatToggle = (window.__floatToggle || 0) + 1; return true; },
-            isFloatBarHidden: () => false,
-            toggleShortcuts: () => { window.__shortcutToggle = (window.__shortcutToggle || 0) + 1; return true; },
-            areShortcutsDisabled: () => false,
+            toggleFloatBar: () => {
+                window.__floatToggle = (window.__floatToggle || 0) + 1;
+                window.__floatHidden = !window.__floatHidden;
+                return { hidden: window.__floatHidden };
+            },
+            isFloatBarHidden: () => Boolean(window.__floatHidden),
+            toggleShortcuts: () => {
+                window.__shortcutToggle = (window.__shortcutToggle || 0) + 1;
+                window.__shortcutsDisabled = !window.__shortcutsDisabled;
+                return { disabled: window.__shortcutsDisabled };
+            },
+            areShortcutsDisabled: () => Boolean(window.__shortcutsDisabled),
             copyDiagnostics: () => { window.__diagnostics = (window.__diagnostics || 0) + 1; return true; },
             getStackState: () => window.__stack,
             acceptRecentCopies() {
@@ -67,25 +78,38 @@ test("live control deck applies a single modifier, repositions an active bar and
     await expect(panel).toContainText("Kontrol Merkezi");
     await expect(host.locator(".recent-copies")).toHaveCount(0);
     await expect(panel).toContainText("Koppy’yi güncelle");
-    await expect(panel).toContainText("Tüm ayarları aç");
-    await expect(panel).toContainText("Diğer araçlar");
+    await expect(panel).toContainText("Ayrıntılı ayarlar");
+    await expect(panel).toContainText("Davranış");
     await host.locator('button[aria-label="Command ile önizleme"]').click();
     await expect.poll(() => page.evaluate(() => window.__deckPrefs.floatBar.globalkeys.command)).toBe(true);
     await expect.poll(() => page.evaluate(() => window.__deckPrefs.floatBar.globalkeys.ctrl)).toBe(false);
-    await host.locator('button[aria-label="Sol alt"]').click();
+    await expect(panel).toContainText("Önizleme: Command (⌘) basılı · Kopya: ⌘C.");
+    await host.locator(".position-select").selectOption("bottom left");
     await expect.poll(() => page.evaluate(() => window.__repositions)).toBe(1);
     await host.locator(".update").click();
     await expect.poll(() => page.evaluate(() => window.__updates)).toBe(1);
-    await host.locator(".tools-toggle").click();
+    await host.locator('button.tab:has-text("Davranış")').click();
+    await host.locator('button[role="switch"]').first().click();
+    await expect.poll(() => page.evaluate(() => window.__deckPrefs.floatBar.globalkeys.previewFollowMouse)).toBe(false);
+    await host.screenshot({ path: "test-results/koppy-control-deck-behavior.png" });
+    await host.locator('button.tab:has-text("Araçlar")').click();
+    await host.screenshot({ path: "test-results/koppy-control-deck-tools.png" });
     await host.locator('button[title="Galeri aç"]').click();
     await host.locator('button[title="Açık görselleri birleştir"]').click();
     await host.locator('button[title="Bu sitede araç çubuğu görünürlüğünü değiştir"]').click();
     await host.locator('button[title="Bu sitede kısayolları değiştir"]').click();
     await host.locator('button[title="Tanı özetini panoya kopyala"]').click();
     await expect.poll(() => page.evaluate(() => [window.__gallery, window.__stitch, window.__floatToggle, window.__shortcutToggle, window.__diagnostics].every(value => value === 1))).toBe(true);
+    await expect(host.locator('button[title="Bu sitede araç çubuğu görünürlüğünü değiştir"]')).toHaveText("Simgeyi göster");
+    await expect(host.locator('button[title="Bu sitede kısayolları değiştir"]')).toHaveText("Kısayolları aç");
+    await host.locator('button[title="Bu sitede araç çubuğu görünürlüğünü değiştir"]').click();
+    await host.locator('button[title="Bu sitede kısayolları değiştir"]').click();
+    await expect.poll(() => page.evaluate(() => window.__floatToggle === 2 && window.__shortcutToggle === 2)).toBe(true);
+    await expect(host.locator('button[title="Bu sitede araç çubuğu görünürlüğünü değiştir"]')).toHaveText("Simgeyi gizle");
+    await expect(host.locator('button[title="Bu sitede kısayolları değiştir"]')).toHaveText("Kısayolları kapat");
     await host.locator('button[title="Galeri aç"]').click();
     await expect(host.locator(".status")).toContainText("Galeri için uygun içerik yok");
-    await host.locator(".tools-toggle").click();
+    await host.locator('button.tab:has-text("Kontrol")').click();
     await host.locator(".pin").click();
     await page.mouse.click(120, 120);
     await expect(panel).toBeVisible();

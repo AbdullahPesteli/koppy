@@ -9,7 +9,7 @@
     // executed in Tampermonkey's isolated world, so a page never receives the
     // pairing secret or the response body. The helper also sends no CORS header.
     const ORIGIN = "http://127.0.0.1:47651";
-    const SCRIPT_VERSION = "0.5.6";
+    const SCRIPT_VERSION = "0.5.8";
     const TOKEN_KEY = "koppy.bridge.token.v1";
     const MAX_ITEMS = 10;
     const MAX_BYTES = 150 * 1024 * 1024;

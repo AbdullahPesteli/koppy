@@ -63,7 +63,7 @@
         let statusMessage = "Son Kopyalar tutulur · ▣ rozeti gerçek çoklu panoya yazar";
         let statusError = false;
         let isPinned = false;
-        let toolsExpanded = false;
+        let activeTab = "control";
         let drag;
         let stackState = typeof settings.getStackState === "function"
             ? settings.getStackState()
@@ -113,6 +113,37 @@
             status.textContent = statusMessage;
             status.dataset.error = String(statusError);
             clearTimeout(closeTimer);
+        }
+
+        function addSwitch(container, label, hint, active, onChange) {
+            const row = create(doc, "div", "switch-row");
+            const copy = create(doc, "div", "switch-copy");
+            copy.append(create(doc, "strong", "", label), create(doc, "small", "", hint));
+            const control = create(doc, "button", "switch", active ? "Açık" : "Kapalı");
+            control.type = "button";
+            control.setAttribute("role", "switch");
+            control.setAttribute("aria-checked", String(active));
+            control.addEventListener("click", event => {
+                if (!isUserEvent(event)) return;
+                onChange();
+            });
+            row.append(copy, control);
+            container.appendChild(row);
+        }
+
+        function addTool(container, label, title, action) {
+            if (typeof action !== "function") return;
+            const button = create(doc, "button", "text-button", label);
+            button.type = "button";
+            button.title = title;
+            button.addEventListener("click", event => {
+                if (!isUserEvent(event)) return;
+                Promise.resolve(action()).then(result => {
+                    if (result === false) setStatus(label + " için uygun içerik yok", true);
+                    else { setStatus(title); render(); }
+                }).catch(() => setStatus(label + " açılamadı", true));
+            });
+            container.appendChild(button);
         }
 
         function render() {
@@ -177,107 +208,154 @@
             header.append(title, ...(recentCopies ? [recentCopies] : []), ...(stackClear ? [stackClear] : []), pin, close);
             panel.appendChild(header);
 
-            const modifierCard = card("Önizleme tuşu", "Sadece biri aktif olabilir.");
-            const modifierGroup = create(doc, "div", "segmented four");
-            MODIFIERS.forEach(item => {
-                const button = create(doc, "button", "key", item.label);
+            const tabs = create(doc, "nav", "tabs");
+            [
+                { id: "control", label: "Kontrol" },
+                { id: "behavior", label: "Davranış" },
+                { id: "tools", label: "Araçlar" },
+            ].forEach(item => {
+                const button = create(doc, "button", "tab", item.label);
                 button.type = "button";
-                button.title = item.name;
-                button.setAttribute("aria-label", item.name + " ile önizleme");
-                button.setAttribute("aria-pressed", String(activeModifier(prefs) === item.id));
+                button.setAttribute("aria-pressed", String(activeTab === item.id));
                 button.addEventListener("click", event => {
                     if (!isUserEvent(event)) return;
-                    const values = {};
-                    MODIFIERS.forEach(modifier => { values["floatBar.globalkeys." + modifier.id] = modifier.id === item.id; });
-                    if (save(values)) {
-                        setStatus(item.name + " seçildi · sonraki hover’da hazır");
-                        render();
-                    } else setStatus("Kaydedilemedi; değişiklik uygulanmadı", true);
-                });
-                modifierGroup.appendChild(button);
-            });
-            modifierCard.appendChild(modifierGroup);
-            panel.appendChild(modifierCard);
-
-            const positionCard = card("Araç çubuğu nerede?", "Aktif bir görsel varsa konumu şimdi güncellenir.");
-            const grid = create(doc, "div", "position-grid");
-            POSITIONS.forEach(item => {
-                const button = create(doc, "button", "position", "");
-                button.type = "button";
-                button.title = item.label;
-                button.setAttribute("aria-label", item.label);
-                button.setAttribute("aria-pressed", String(prefs.floatBar.position === item.value));
-                button.dataset.position = item.value;
-                button.appendChild(create(doc, "span", "position-dot"));
-                button.addEventListener("click", event => {
-                    if (!isUserEvent(event)) return;
-                    if (save({ "floatBar.position": item.value })) {
-                        refreshVisibleFloatBar();
-                        setStatus(item.label + " seçildi");
-                        render();
-                    } else setStatus("Kaydedilemedi; değişiklik uygulanmadı", true);
-                });
-                grid.appendChild(button);
-            });
-            positionCard.appendChild(grid);
-            panel.appendChild(positionCard);
-
-            const previewCard = card("Süzülen preview boyutu", "Büyük görseller ekrana taşmadan aynı oranı korur.");
-            const sizeGroup = create(doc, "div", "segmented sizes");
-            SIZES.forEach(item => {
-                const button = create(doc, "button", "text-button", item.label);
-                button.type = "button";
-                button.setAttribute("aria-pressed", String(activeSize(prefs) === item.id));
-                button.addEventListener("click", event => {
-                    if (!isUserEvent(event)) return;
-                    if (save({
-                        "floatBar.previewMaxSizeW": item.width,
-                        "floatBar.previewMaxSizeH": item.height,
-                    })) {
-                        const changed = refreshVisiblePreview();
-                        setStatus(changed ? "Preview şimdi yeniden ölçülendi" : item.label + " seçildi · sonraki hover’da hazır");
-                        render();
-                    } else setStatus("Kaydedilemedi; değişiklik uygulanmadı", true);
-                });
-                sizeGroup.appendChild(button);
-            });
-            previewCard.appendChild(sizeGroup);
-            panel.appendChild(previewCard);
-
-            const toolsCard = card("Diğer araçlar", "Bu site için hızlı eylemler.");
-            const tools = create(doc, "div", "segmented utilities");
-            const addTool = (label, title, action) => {
-                if (typeof action !== "function") return;
-                const button = create(doc, "button", "text-button", label);
-                button.type = "button";
-                button.title = title;
-                button.addEventListener("click", event => {
-                    if (!isUserEvent(event)) return;
-                    Promise.resolve(action()).then(result => {
-                        if (result === false) setStatus(label + " için uygun içerik yok", true);
-                        else { setStatus(title); render(); }
-                    }).catch(() => setStatus(label + " açılamadı", true));
-                });
-                tools.appendChild(button);
-            };
-            addTool("Galeri", "Galeri aç", settings.openGallery);
-            addTool("Birleştir", "Açık görselleri birleştir", settings.openStitcher);
-            addTool(typeof settings.isFloatBarHidden === "function" && settings.isFloatBarHidden() ? "Simgeyi göster" : "Simgeyi gizle", "Bu sitede araç çubuğu görünürlüğünü değiştir", settings.toggleFloatBar);
-            addTool(typeof settings.areShortcutsDisabled === "function" && settings.areShortcutsDisabled() ? "Kısayolları aç" : "Kısayolları kapat", "Bu sitede kısayolları değiştir", settings.toggleShortcuts);
-            addTool("Tanı", "Tanı özetini panoya kopyala", settings.copyDiagnostics);
-            if (tools.childElementCount) {
-                const toolsToggle = create(doc, "button", "tools-toggle", toolsExpanded ? "Diğer araçları gizle" : "Diğer araçlar · " + tools.childElementCount);
-                toolsToggle.type = "button";
-                toolsToggle.addEventListener("click", event => {
-                    if (!isUserEvent(event)) return;
-                    toolsExpanded = !toolsExpanded;
+                    activeTab = item.id;
                     render();
                 });
-                panel.appendChild(toolsToggle);
-                if (toolsExpanded) {
-                    toolsCard.appendChild(tools);
-                    panel.appendChild(toolsCard);
-                }
+                tabs.appendChild(button);
+            });
+            panel.appendChild(tabs);
+
+            if (activeTab === "control") {
+                const selectedModifier = MODIFIERS.find(item => item.id === activeModifier(prefs)) || MODIFIERS[3];
+                const modifierCard = card("Önizleme tuşu", "Önizleme: " + selectedModifier.name + " (" + selectedModifier.label + ") basılı · Kopya: ⌘C.");
+                const modifierGroup = create(doc, "div", "segmented four");
+                MODIFIERS.forEach(item => {
+                    const button = create(doc, "button", "key", item.label);
+                    button.type = "button";
+                    button.title = item.name;
+                    button.setAttribute("aria-label", item.name + " ile önizleme");
+                    button.setAttribute("aria-pressed", String(activeModifier(prefs) === item.id));
+                    button.addEventListener("click", event => {
+                        if (!isUserEvent(event)) return;
+                        const values = {};
+                        MODIFIERS.forEach(modifier => { values["floatBar.globalkeys." + modifier.id] = modifier.id === item.id; });
+                        if (save(values)) {
+                            setStatus(item.name + " seçildi · sonraki hover’da hazır");
+                            render();
+                        } else setStatus("Kaydedilemedi; değişiklik uygulanmadı", true);
+                    });
+                    modifierGroup.appendChild(button);
+                });
+                modifierCard.appendChild(modifierGroup);
+                panel.appendChild(modifierCard);
+
+                const previewCard = card("Süzülen preview boyutu", "Büyük görseller ekrana taşmadan aynı oranı korur.");
+                const sizeGroup = create(doc, "div", "segmented sizes");
+                SIZES.forEach(item => {
+                    const button = create(doc, "button", "text-button", item.label);
+                    button.type = "button";
+                    button.setAttribute("aria-pressed", String(activeSize(prefs) === item.id));
+                    button.addEventListener("click", event => {
+                        if (!isUserEvent(event)) return;
+                        if (save({
+                            "floatBar.previewMaxSizeW": item.width,
+                            "floatBar.previewMaxSizeH": item.height,
+                        })) {
+                            const changed = refreshVisiblePreview();
+                            setStatus(changed ? "Preview şimdi yeniden ölçülendi" : item.label + " seçildi · sonraki hover’da hazır");
+                            render();
+                        } else setStatus("Kaydedilemedi; değişiklik uygulanmadı", true);
+                    });
+                    sizeGroup.appendChild(button);
+                });
+                previewCard.appendChild(sizeGroup);
+                panel.appendChild(previewCard);
+
+                const positionCard = card("Araç çubuğu", "Aktif görseldeki düğmeler burada görünür.");
+                const positionRow = create(doc, "label", "select-row");
+                positionRow.append(create(doc, "span", "", "Konum"));
+                const position = create(doc, "select", "position-select");
+                position.setAttribute("aria-label", "Araç çubuğu konumu");
+                POSITIONS.forEach(item => {
+                    const option = create(doc, "option", "", item.label);
+                    option.value = item.value;
+                    option.selected = prefs.floatBar.position === item.value;
+                    position.appendChild(option);
+                });
+                position.addEventListener("change", event => {
+                    if (!isUserEvent(event)) return;
+                    if (save({ "floatBar.position": position.value })) {
+                        refreshVisibleFloatBar();
+                        setStatus(position.options[position.selectedIndex].textContent + " seçildi");
+                    } else setStatus("Kaydedilemedi; değişiklik uygulanmadı", true);
+                });
+                positionRow.appendChild(position);
+                positionCard.appendChild(positionRow);
+                panel.appendChild(positionCard);
+            }
+
+            if (activeTab === "behavior") {
+                const previewBehavior = card("Preview davranışı", "Hover deneyimini bozmadan ayarlanır.");
+                addSwitch(previewBehavior, "Mouse’u takip et", "Preview imlecin yanında kalır.", Boolean(prefs.floatBar.globalkeys.previewFollowMouse), () => {
+                    if (save({ "floatBar.globalkeys.previewFollowMouse": !prefs.floatBar.globalkeys.previewFollowMouse })) {
+                        setStatus("Preview takip davranışı güncellendi"); render();
+                    } else setStatus("Kaydedilemedi; değişiklik uygulanmadı", true);
+                });
+                addSwitch(previewBehavior, "Tuşu bırakınca kapat", "Kapalıysa preview sabit kalır.", Boolean(prefs.floatBar.globalkeys.closeAfterPreview), () => {
+                    if (save({ "floatBar.globalkeys.closeAfterPreview": !prefs.floatBar.globalkeys.closeAfterPreview })) {
+                        setStatus("Preview kapanış davranışı güncellendi"); render();
+                    } else setStatus("Kaydedilemedi; değişiklik uygulanmadı", true);
+                });
+                panel.appendChild(previewBehavior);
+
+                const hoverCard = card("Hover hızı", "Araç çubuğunun açılış ve kapanış ritmi.");
+                const speedGroup = create(doc, "div", "segmented speeds");
+                [
+                    { label: "Anında", show: 0, hide: 160 },
+                    { label: "Dengeli", show: 100, hide: 566 },
+                    { label: "Sakin", show: 260, hide: 720 },
+                ].forEach(item => {
+                    const button = create(doc, "button", "text-button", item.label);
+                    button.type = "button";
+                    const active = Number(prefs.floatBar.showDelay) === item.show && Number(prefs.floatBar.hideDelay) === item.hide;
+                    button.setAttribute("aria-pressed", String(active));
+                    button.addEventListener("click", event => {
+                        if (!isUserEvent(event)) return;
+                        if (save({ "floatBar.showDelay": item.show, "floatBar.hideDelay": item.hide })) {
+                            setStatus(item.label + " hover hızı seçildi"); render();
+                        } else setStatus("Kaydedilemedi; değişiklik uygulanmadı", true);
+                    });
+                    speedGroup.appendChild(button);
+                });
+                hoverCard.appendChild(speedGroup);
+                panel.appendChild(hoverCard);
+
+                const barBehavior = card("Araç çubuğu", "Görselin üstünde veya dışında konumlanır.");
+                addSwitch(barBehavior, "Görselin dışında", "Düğmeler resmin üstünü kapatmaz.", Boolean(prefs.floatBar.stayOut), () => {
+                    if (save({ "floatBar.stayOut": !prefs.floatBar.stayOut })) {
+                        refreshVisibleFloatBar();
+                        setStatus("Araç çubuğu yerleşimi güncellendi"); render();
+                    } else setStatus("Kaydedilemedi; değişiklik uygulanmadı", true);
+                });
+                panel.appendChild(barBehavior);
+            }
+
+            if (activeTab === "tools") {
+                const siteCard = card("Bu sitede", "Yalnız açık sayfanın davranışını değiştirir.");
+                const siteTools = create(doc, "div", "segmented utilities");
+                addTool(siteTools, typeof settings.isFloatBarHidden === "function" && settings.isFloatBarHidden() ? "Simgeyi göster" : "Simgeyi gizle", "Bu sitede araç çubuğu görünürlüğünü değiştir", settings.toggleFloatBar);
+                addTool(siteTools, typeof settings.areShortcutsDisabled === "function" && settings.areShortcutsDisabled() ? "Kısayolları aç" : "Kısayolları kapat", "Bu sitede kısayolları değiştir", settings.toggleShortcuts);
+                siteCard.appendChild(siteTools);
+                panel.appendChild(siteCard);
+
+                const actionCard = card("Araçlar", "Geçici işi burada aç; ayarlar etkilenmez.");
+                const tools = create(doc, "div", "segmented utilities");
+                addTool(tools, "Galeri", "Galeri aç", settings.openGallery);
+                addTool(tools, "Birleştir", "Açık görselleri birleştir", settings.openStitcher);
+                addTool(tools, "Tanı", "Tanı özetini panoya kopyala", settings.copyDiagnostics);
+                actionCard.appendChild(tools);
+                panel.appendChild(actionCard);
             }
 
             const footer = create(doc, "footer", "footer");
@@ -293,7 +371,7 @@
                 });
                 footer.appendChild(update);
             }
-            const full = create(doc, "button", "full-settings", "Tüm ayarları aç  →");
+            const full = create(doc, "button", "full-settings", "Ayrıntılı ayarlar  →");
             full.type = "button";
             full.addEventListener("click", event => {
                 if (!isUserEvent(event)) return;
@@ -334,11 +412,11 @@
                 .title-copy { display: grid; gap: 1px; } .title-copy strong { font-size: 14px; } .title-copy small { color: #aab4c2; font-size: 11px; }
                 button { appearance: none; font: inherit; color: inherit; cursor: pointer; } .icon { width: 30px; height: 30px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #aab4c2; font-size: 22px; line-height: 1; } .icon:hover { background: #171c25; border-color: #2a3340; color: #f4f7fb; } .pin, .recent-copies { min-width: 55px; height: 30px; margin-right: 4px; padding: 0 7px; border: 1px solid #2a3340; border-radius: 8px; background: transparent; color: #aab4c2; font-size: 11px; font-weight: 650; } .pin:hover, .recent-copies:hover { color: #f4f7fb; border-color: #52647c; background: #171c25; } .recent-copies { color: #dbe5ff; background: #1a2336; border-color: #40547c; } .stack-clear { width: 24px; height: 30px; margin: 0 2px 0 -4px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: #ff9daa; font-size: 18px; line-height: 1; } .stack-clear:hover { background: rgba(255,113,133,.12); color: #ffd5dc; }
                 .card { padding: 14px; border-bottom: 1px solid #252e3a; } h2 { margin: 0; font-size: 12px; letter-spacing: .01em; } p { margin: 3px 0 10px; color: #aab4c2; font-size: 11px; }
+                .tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 8px 14px; border-bottom: 1px solid #252e3a; background: #10151d; } .tab { min-height: 30px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: #aab4c2; font-size: 11px; font-weight: 650; } .tab:hover { color: #f4f7fb; background: #171c25; } .tab[aria-pressed="true"] { color: #fff; border-color: #536fab; background: #27365a; }
                 .segmented { display: grid; gap: 5px; padding: 4px; border-radius: 10px; background: #0e1218; border: 1px solid #2a3340; } .segmented.four { grid-template-columns: repeat(4, 1fr); } .segmented.sizes { grid-template-columns: 1.35fr 1fr 1fr; }
-                .segmented button { min-height: 34px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: #aab4c2; } .segmented button:hover { color: #f4f7fb; background: #171c25; } .segmented button[aria-pressed="true"] { color: #fff; background: #263557; border-color: #6281e8; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); } .tools-toggle { width: calc(100% - 28px); min-height: 30px; margin: 0 14px; border: 1px solid #2a3340; border-radius: 8px; background: transparent; color: #aab4c2; text-align: left; padding: 0 10px; font: 600 11px/1 -apple-system, BlinkMacSystemFont, sans-serif; } .tools-toggle:hover { color: #f4f7fb; border-color: #52647c; background: #171c25; } .utilities { display: flex; flex-wrap: wrap; gap: 3px; } .utilities .text-button { flex: 1 1 92px; min-height: 30px; border: 1px solid #2a3340; }
+                .segmented button { min-height: 34px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: #aab4c2; } .segmented button:hover { color: #f4f7fb; background: #171c25; } .segmented button[aria-pressed="true"] { color: #fff; background: #263557; border-color: #6281e8; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); } .segmented.speeds { grid-template-columns: repeat(3, 1fr); } .utilities { display: flex; flex-wrap: wrap; gap: 3px; } .utilities .text-button { flex: 1 1 92px; min-height: 30px; border: 1px solid #2a3340; }
                 .key { font-size: 17px !important; font-weight: 650; } .text-button { padding: 0 6px; font-size: 11px; }
-                .position-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; } .position { position: relative; height: 38px; border: 1px solid #2a3340; border-radius: 8px; background: #0e1218; } .position:hover { border-color: #52647c; background: #171c25; } .position[aria-pressed="true"] { border-color: #6281e8; background: #202d49; } .position-dot { position: absolute; width: 7px; height: 7px; border-radius: 999px; background: #778393; } .position[aria-pressed="true"] .position-dot { background: #9db4ff; box-shadow: 0 0 0 3px rgba(124,156,255,.18); }
-                .position[data-position="top left"] .position-dot { left: 7px; top: 7px; } .position[data-position="top center"] .position-dot { left: calc(50% - 3px); top: 7px; } .position[data-position="top right"] .position-dot { right: 7px; top: 7px; } .position[data-position="bottom left"] .position-dot { left: 7px; bottom: 7px; } .position[data-position="bottom center"] .position-dot { left: calc(50% - 3px); bottom: 7px; } .position[data-position="bottom right"] .position-dot { right: 7px; bottom: 7px; }
+                .select-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; padding: 0 10px; border: 1px solid #2a3340; border-radius: 9px; background: #0e1218; color: #cbd5e1; font-size: 11px; font-weight: 650; } .position-select { min-width: 116px; border: 0; outline: 0; background: transparent; color: #f4f7fb; font: inherit; text-align: right; } .position-select option { color: #11151c; } .switch-row { display: flex; min-height: 46px; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid #252e3a; } .switch-row:first-of-type { border-top: 0; padding-top: 0; } .switch-copy { min-width: 0; margin-right: auto; display: grid; gap: 1px; } .switch-copy strong { font-size: 11px; } .switch-copy small { color: #aab4c2; font-size: 10px; } .switch { min-width: 52px; height: 28px; border: 1px solid #2a3340; border-radius: 999px; background: #171c25; color: #aab4c2; font-size: 10px; font-weight: 700; } .switch:hover { border-color: #52647c; color: #f4f7fb; } .switch[aria-checked="true"] { border-color: #6281e8; background: #263557; color: #e8eeff; }
                 .footer { display: grid; gap: 6px; padding: 10px 14px; } .full-settings, .update { width: 100%; min-height: 34px; border: 1px solid #2a3340; border-radius: 8px; background: transparent; color: #cbd5e1; text-align: left; padding: 0 10px; } .full-settings:hover, .update:hover { color: #f4f7fb; border-color: #52647c; background: #171c25; } .update { color: #b9c9ff; border-color: #40547c; background: #141b29; }
                 .status { min-height: 32px; padding: 8px 14px; border-top: 1px solid #252e3a; color: #aab4c2; background: #0e1218; font-size: 11px; } .status[data-error="true"] { color: #ff9daa; }
                 @media (max-width: 600px) { .panel { right: 8px; left: 8px; top: auto; bottom: 8px; width: auto; transform: translateY(8px) scale(.99); } .panel.open { transform: translateY(0) scale(1); } .panel.manual { right: auto; bottom: auto; transform: none; } }
