@@ -116,6 +116,50 @@ test("a directly opened Google thumbnail remains a generic binary-copy candidate
     assert.equal(candidate.isThumbnailFallback, true);
 });
 
+test("a normal Google result can copy its visible embedded image preview locally", async () => {
+    const tinyPng = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL5VQAAAABJRU5ErkJggg==";
+    const dom = new JSDOM(`<!doctype html><img id="result" width="92" height="92" src="${tinyPng}">`, {
+        url: "https://www.google.com/search?q=vaseline+jel",
+    });
+    const image = makeVisible(dom.window.document.getElementById("result"), 92, 92);
+    const candidate = Koppy.resolveQuickHoverImageCandidates(image, { baseUrl: dom.window.location.href })[0];
+    assert.equal(candidate.source, "embedded-preview");
+    assert.equal(candidate.isThumbnailFallback, true);
+    let requested = false;
+    const downloaded = await Koppy.requestImageWithGM(candidate.url, () => { requested = true; }).promise;
+    assert.equal(requested, false, "embedded data must not make a privileged network request");
+    assert.equal(downloaded.blob.type, "image/png");
+    assert.equal(downloaded.blob.size > 0, true);
+});
+
+test("embedded UI icons do not become copy candidates", () => {
+    const tinyPng = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL5VQAAAABJRU5ErkJggg==";
+    const dom = new JSDOM(`<!doctype html><img id="icon" width="28" height="28" src="${tinyPng}">`, {
+        url: "https://www.google.com/search?q=vaseline+jel",
+    });
+    const image = makeVisible(dom.window.document.getElementById("icon"), 28, 28);
+    assert.deepEqual(Koppy.resolveQuickHoverImageCandidates(image, { baseUrl: dom.window.location.href }), []);
+});
+
+test("embedded previews reject whitespace and oversize data before atob allocation", async () => {
+    const originalAtob = global.atob;
+    let decoded = false;
+    global.atob = () => { decoded = true; return ""; };
+    try {
+        await assert.rejects(
+            Koppy.requestImageWithGM("data:image/png;base64,A A A A", () => {}, { maxBytes: 4 }).promise,
+            /Güvenli olmayan görsel adresi/
+        );
+        await assert.rejects(
+            Koppy.requestImageWithGM("data:image/png;base64,AAAAAAAAAAAA", () => {}, { maxBytes: 4 }).promise,
+            /güvenlik sınırını aşıyor/
+        );
+        assert.equal(decoded, false);
+    } finally {
+        global.atob = originalAtob;
+    }
+});
+
 test("generic candidates include CSS backgrounds, video posters and SVG image sources", () => {
     const dom = new JSDOM(`<!doctype html><body>
         <button id="card" style="width: 320px; height: 200px; background-image: url('https://cdn.example.test/card-original.webp')"></button>

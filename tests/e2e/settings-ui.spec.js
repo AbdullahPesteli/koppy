@@ -95,7 +95,13 @@ async function bootBuiltKoppy(page, storedPreferences) {
 }
 
 async function openSettings(page) {
+    // The Tampermonkey menu is deliberately a single compact Control Centre;
+    // exercise the real entry and then its in-panel Settings action.
+    await expect.poll(() => page.evaluate(() => window.__commands.map(command => command.label))).toEqual(["Koppy · Kontrol Merkezi"]);
     await page.evaluate(() => window.__commands[0].callback());
+    const deck = page.locator("koppy-control-deck");
+    await expect(deck.locator(".panel.open")).toBeVisible();
+    await deck.locator(".full-settings").click();
     await expect.poll(async () => {
         for (const candidate of page.frames()) {
             if (candidate === page.mainFrame()) continue;
@@ -202,7 +208,9 @@ test("real dist settings are readable, searchable, persistent and responsive", a
         leakedFrame: false,
         leakedTokenField: false,
         frameDocumentReadable: false,
-        capturedShadowCount: 1,
+        // Kontrol Merkezi'nin görsel kökü ile kapalı ayar kökü ayrı tutulur.
+        // Gizli alanları barındıran ayar kökü host.shadowRoot üzerinden okunamaz.
+        capturedShadowCount: 2,
         capturedFrameCount: 1,
         capturedFrameDocumentReadable: false,
         capturedSourceLeaksToken: false,

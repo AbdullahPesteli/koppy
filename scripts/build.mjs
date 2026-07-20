@@ -75,7 +75,7 @@ const replacements = new Map([
     ["// @name:pt-BR           Picviewer CE+", "// @name:pt-BR           Koppy"],
     ["// @name:ru              Picviewer CE+", "// @name:ru              Koppy"],
     ["// @author               NLF && ywzhaiqi && hoothin", "// @author               NLF && ywzhaiqi && hoothin; Koppy fork by pestly"],
-    ["// @version              2026.2.6.1", "// @version              0.5.6"],
+    ["// @version              2026.2.6.1", "// @version              0.5.7"],
     ["// @namespace            https://github.com/hoothin/UserScripts", "// @namespace            https://github.com/AbdullahPesteli/koppy"],
     ["// @homepage             https://pv.hoothin.com/", "// @homepage             https://github.com/AbdullahPesteli/koppy"],
     ["// @supportURL           https://github.com/hoothin/UserScripts/issues", "// @supportURL           https://github.com/AbdullahPesteli/koppy/issues"],
@@ -239,6 +239,20 @@ const legacyImportTabWrite = "localStorage.setItem('picviewerCE.config.curTab', 
 if (!source.includes(legacyImportTabWrite)) throw new Error("Upstream imported-rule tab marker missing");
 source = source.replace(legacyImportTabWrite, "GM_config.__koppyTab = 4;");
 
+// Tampermonkey has a flat menu, so Picviewer's six historical commands plus
+// Koppy's controls produced an unreadable extension dropdown. The control deck
+// is now the single entry point; it exposes Gallery and quick actions on
+// demand, plus full settings and updates in its footer. The underlying
+// Picviewer features remain in the build.
+const upstreamMenuStart = '        _GM_registerMenuCommand(i18n("openConfig"), openPrefs);';
+const upstreamMenuEnd = '        _GM_registerMenuCommand(i18n("ruleRequest"), () => {\n            _GM_openInTab("https://github.com/hoothin/UserScripts/issues/new?labels=Picviewer%20CE%2B&template=custom-rule-request.md&title=Request%20Picviewer%20CE%2B%20support%20for%20" + location.hostname, {active:true});\n        });';
+const upstreamMenuStartIndex = source.indexOf(upstreamMenuStart);
+const upstreamMenuEndIndex = source.indexOf(upstreamMenuEnd, upstreamMenuStartIndex);
+if (upstreamMenuStartIndex === -1 || upstreamMenuEndIndex === -1) throw new Error("Upstream menu block markers missing");
+source = source.slice(0, upstreamMenuStartIndex)
+    + '        // Koppy exposes these controls through its compact Control Deck.\n'
+    + source.slice(upstreamMenuEndIndex + upstreamMenuEnd.length);
+
 const executableRuleLoad = `                        if (prefs.customRules.indexOf("name:") !== -1) {
                             if (!isunsafe()) {
                                 customRules = unsafeWindow.eval(createScript(prefs.customRules));
@@ -309,6 +323,34 @@ const controlDeckIntegration = `        const koppyOpenUpdate = () => _GM_openIn
             _GM_setClipboard(text, "text");
             _GM_notification("Koppy tanı özeti panoya kopyalandı");
         };
+        const koppyOpenStitcher = () => {
+            if (ImgWindowC.all && ImgWindowC.all.length) ImgWindowC.all.slice(0).forEach(win => win.remove(true));
+            if (!stitcher) return false;
+            stitcher.openSelect();
+            return true;
+        };
+        const koppyOpenGallery = () => Promise.resolve(openGallery()).then(gallery => gallery || false);
+        const koppyToggleFloatBar = () => {
+            hideIcon = !hideIcon;
+            storage.setListItem("hideIcon", location.hostname, hideIcon);
+            if (hideIcon) document.head.appendChild(hideIconStyle);
+            else if (hideIconStyle.parentNode) hideIconStyle.parentNode.removeChild(hideIconStyle);
+            return hideIcon;
+        };
+        const koppyIsFloatBarHidden = () => Boolean(hideIcon);
+        const koppyToggleShortcuts = () => {
+            const originPattern = location.origin.replace(/^https?/, "https?").replace(/\\./g, "\\\\.");
+            const pattern = "^" + originPattern + location.pathname.replace(/[^\\/]*$/, "");
+            const list = normalizeDisableKeySites(prefs.floatBar.disableKeySites);
+            const disabled = list.indexOf(pattern) === -1;
+            saveDisableKeySites(disabled ? [pattern].concat(list) : list.filter(item => item !== pattern));
+            return disabled;
+        };
+        const koppyAreShortcutsDisabled = () => {
+            const originPattern = location.origin.replace(/^https?/, "https?").replace(/\\./g, "\\\\.");
+            const pattern = "^" + originPattern + location.pathname.replace(/[^\\/]*$/, "");
+            return normalizeDisableKeySites(prefs.floatBar.disableKeySites).indexOf(pattern) !== -1;
+        };
         const koppyControlDeck = globalThis.KoppyControlDeck.install({
             config: GM_config,
             prefs: prefs,
@@ -318,14 +360,19 @@ const controlDeckIntegration = `        const koppyOpenUpdate = () => _GM_openIn
             getPreview: () => uniqueImgWin,
             openFullSettings: () => globalThis.KoppySettingsUI.openSecure(),
             openUpdate: koppyOpenUpdate,
+            openGallery: koppyOpenGallery,
+            openStitcher: koppyOpenStitcher,
+            toggleFloatBar: koppyToggleFloatBar,
+            isFloatBarHidden: koppyIsFloatBarHidden,
+            toggleShortcuts: koppyToggleShortcuts,
+            areShortcutsDisabled: koppyAreShortcutsDisabled,
+            copyDiagnostics: koppyCopyDiagnostics,
             getStackState: () => globalThis.KoppyCopyController.getStackState(),
             clearStack: () => globalThis.KoppyCopyController.clearStack(),
             acceptRecentCopies: () => globalThis.KoppyCopyController.acceptRecentCopies(),
             onStackChange: listener => globalThis.KoppyCopyController.onStackChange(listener),
         });
-        if (koppyControlDeck) _GM_registerMenuCommand("Koppy Canlı Kontrol", () => koppyControlDeck.toggle());
-        _GM_registerMenuCommand("Koppy · Güncellemeyi aç", koppyOpenUpdate);
-        _GM_registerMenuCommand("Koppy · Tanı özetini kopyala", koppyCopyDiagnostics);
+        if (koppyControlDeck) _GM_registerMenuCommand("Koppy · Kontrol Merkezi", () => koppyControlDeck.toggle());
 
 `;
 source = source.replace(marker, bridgeValueAliases + integration + controlDeckIntegration + diagnosticReporterIntegration + marker);

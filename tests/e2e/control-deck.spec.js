@@ -35,6 +35,16 @@ test("live control deck applies a single modifier, repositions an active bar and
             document, window, config, prefs,
             getFloatBar: () => ({ shown: true, data: {}, setPosition() { window.__repositions += 1; } }),
             openUpdate: () => { window.__updates = (window.__updates || 0) + 1; return true; },
+            openGallery: () => {
+                window.__gallery = (window.__gallery || 0) + 1;
+                return Promise.resolve(window.__gallery === 1 ? { opened: true } : false);
+            },
+            openStitcher: () => { window.__stitch = (window.__stitch || 0) + 1; return true; },
+            toggleFloatBar: () => { window.__floatToggle = (window.__floatToggle || 0) + 1; return true; },
+            isFloatBarHidden: () => false,
+            toggleShortcuts: () => { window.__shortcutToggle = (window.__shortcutToggle || 0) + 1; return true; },
+            areShortcutsDisabled: () => false,
+            copyDiagnostics: () => { window.__diagnostics = (window.__diagnostics || 0) + 1; return true; },
             getStackState: () => window.__stack,
             acceptRecentCopies() {
                 window.__stack = Object.assign({}, window.__stack, { accepted: true });
@@ -54,10 +64,11 @@ test("live control deck applies a single modifier, repositions an active bar and
     const host = page.locator("koppy-control-deck");
     const panel = host.locator(".panel");
     await expect(panel).toBeVisible();
-    await expect(panel).toContainText("Canlı Kontrol");
+    await expect(panel).toContainText("Kontrol Merkezi");
     await expect(host.locator(".recent-copies")).toHaveCount(0);
     await expect(panel).toContainText("Koppy’yi güncelle");
     await expect(panel).toContainText("Tüm ayarları aç");
+    await expect(panel).toContainText("Diğer araçlar");
     await host.locator('button[aria-label="Command ile önizleme"]').click();
     await expect.poll(() => page.evaluate(() => window.__deckPrefs.floatBar.globalkeys.command)).toBe(true);
     await expect.poll(() => page.evaluate(() => window.__deckPrefs.floatBar.globalkeys.ctrl)).toBe(false);
@@ -65,6 +76,16 @@ test("live control deck applies a single modifier, repositions an active bar and
     await expect.poll(() => page.evaluate(() => window.__repositions)).toBe(1);
     await host.locator(".update").click();
     await expect.poll(() => page.evaluate(() => window.__updates)).toBe(1);
+    await host.locator(".tools-toggle").click();
+    await host.locator('button[title="Galeri aç"]').click();
+    await host.locator('button[title="Açık görselleri birleştir"]').click();
+    await host.locator('button[title="Bu sitede araç çubuğu görünürlüğünü değiştir"]').click();
+    await host.locator('button[title="Bu sitede kısayolları değiştir"]').click();
+    await host.locator('button[title="Tanı özetini panoya kopyala"]').click();
+    await expect.poll(() => page.evaluate(() => [window.__gallery, window.__stitch, window.__floatToggle, window.__shortcutToggle, window.__diagnostics].every(value => value === 1))).toBe(true);
+    await host.locator('button[title="Galeri aç"]').click();
+    await expect(host.locator(".status")).toContainText("Galeri için uygun içerik yok");
+    await host.locator(".tools-toggle").click();
     await host.locator(".pin").click();
     await page.mouse.click(120, 120);
     await expect(panel).toBeVisible();

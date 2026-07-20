@@ -11,6 +11,11 @@
     const MAX_IMAGE_BYTES = 80 * 1024 * 1024;
     const MAX_IMAGE_PIXELS = 40 * 1024 * 1024;
     const MAX_IMAGE_DIMENSION = 16384;
+    const MAX_EMBEDDED_IMAGE_URL_CHARS = Math.ceil(MAX_IMAGE_BYTES * 4 / 3) + 128;
+
+    function maxEmbeddedImageUrlChars(maxBytes) {
+        return Math.ceil(Number(maxBytes || MAX_IMAGE_BYTES) * 4 / 3) + 128;
+    }
     // Recent copies are retained only inside this tab. Every Cmd+C still writes
     // exactly one portable PNG to the system clipboard; the optional native
     // Bridge will later turn an explicitly accepted list into multi-item paste.
@@ -57,6 +62,15 @@
         if (String(locationLike.pathname || "") !== "/search") return false;
         const params = new URLSearchParams(String(locationLike.search || ""));
         return params.get("tbm") === "isch" || params.get("udm") === "2";
+    }
+
+    function isNormalGoogleSearchLocation(locationLike) {
+        let location = locationLike;
+        try {
+            if (typeof locationLike === "string") location = new URL(locationLike);
+        } catch (_) { return false; }
+        if (!location || !isGoogleHostname(location.hostname) || String(location.pathname || "") !== "/search") return false;
+        return !isGoogleImagesLocation(location);
     }
 
     function isPrivateIpv4(hostname) {
@@ -124,6 +138,25 @@
         if (parsed.protocol !== "https:" || parsed.username || parsed.password || isPrivateHost(parsed.hostname)) return null;
         parsed.hash = "";
         return parsed.href;
+    }
+
+    function embeddedImageCandidate(rawUrl, element, source) {
+        // Google normal web search sometimes puts its result thumbnails straight
+        // in the DOM as a data:image/... URL. They have no fetchable HTTPS URL,
+        // but are still real pixels the user is looking at. Keep this path
+        // deliberately narrow: image only, base64 only, and never for tiny UI
+        // icons. It is decoded locally by requestImageWithGM below; no network
+        // request or privileged URL fetch is involved.
+        if (typeof rawUrl !== "string" || rawUrl.length > MAX_EMBEDDED_IMAGE_URL_CHARS) return null;
+        const value = rawUrl.trim();
+        // SVG is intentionally not accepted here. Embedded SVG may carry remote
+        // references; the Google result path is for inert raster previews only.
+        if (!/^data:image\/(?:png|jpe?g|webp|gif|bmp);base64,[a-z0-9+/]*={0,2}$/i.test(value)) return null;
+        const rect = element && typeof element.getBoundingClientRect === "function" ? element.getBoundingClientRect() : null;
+        const width = Number(element && (element.clientWidth || element.width) || (rect && rect.width) || 0);
+        const height = Number(element && (element.clientHeight || element.height) || (rect && rect.height) || 0);
+        if (width < 40 || height < 40) return null;
+        return { url: value, element, source: source || "embedded-preview", isThumbnailFallback: true, isEmbeddedPreview: true };
     }
 
     function parseGoogleImageUrl(rawHref, baseUrl) {
@@ -442,6 +475,12 @@
         imageUrlsFromBackground(element, baseUrl).forEach(candidate => add(candidate.url, candidate.source));
         if (String(element.nodeName).toUpperCase() === "IMG") imageSourceSet(element, baseUrl, true, false).forEach(candidate => add(candidate.url, candidate.source, candidate));
         documentUrlsFromElement(element, baseUrl).forEach(candidate => add(candidate.url, candidate.source, candidate));
+        // This is intentionally last: a resolver, lazy-load field or normal
+        // HTTPS src is always more useful than Google's embedded result preview.
+        if (!candidates.length && settings.allowEmbeddedPreview !== false && isNormalGoogleSearchLocation(baseUrl) && String(element.nodeName).toUpperCase() === "IMG") {
+            const embedded = embeddedImageCandidate(element.currentSrc || element.src || (element.getAttribute && element.getAttribute("src")), element, "embedded-preview");
+            if (embedded) candidates.push(embedded);
+        }
         return candidates;
     }
 
@@ -466,6 +505,33 @@
         const timeout = settings.timeout || REQUEST_TIMEOUT_MS;
         const maxRedirects = Number.isInteger(settings.maxRedirects) ? settings.maxRedirects : 5;
         const onProgress = typeof settings.onProgress === "function" ? settings.onProgress : null;
+        // Reject before a regexp capture, whitespace normalization or atob can
+        // allocate a second attacker-controlled string. Keep this exact raster
+        // allowlist in sync with embeddedImageCandidate above.
+        const embedded = typeof url === "string" && url.length <= maxEmbeddedImageUrlChars(maxBytes) && url.match(/^data:(image\/(?:png|jpe?g|webp|gif|bmp));base64,([a-z0-9+/]*={0,2})$/i);
+        if (embedded) {
+            let cancelled = false;
+            const mime = embedded[1].toLowerCase();
+            const encoded = embedded[2];
+            const estimatedBytes = Math.floor(encoded.length * 3 / 4);
+            return {
+                promise: new Promise((resolve, reject) => {
+                    if (estimatedBytes > maxBytes) return reject(new Error("Gömülü görsel " + Math.round(maxBytes / 1024 / 1024) + " MB güvenlik sınırını aşıyor"));
+                    try {
+                        const binary = atob(encoded);
+                        if (cancelled) return reject(new Error("Görsel indirme iptal edildi"));
+                        const bytes = new Uint8Array(binary.length);
+                        for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+                        if (bytes.byteLength > maxBytes) throw new Error("Gömülü görsel " + Math.round(maxBytes / 1024 / 1024) + " MB güvenlik sınırını aşıyor");
+                        if (onProgress) onProgress({ loaded: bytes.byteLength, total: bytes.byteLength, lengthComputable: true });
+                        resolve({ blob: new Blob([bytes], { type: mime }), finalUrl: "embedded-image" });
+                    } catch (error) {
+                        reject(error instanceof Error ? error : new Error("Gömülü görsel çözülemedi"));
+                    }
+                }),
+                abort() { cancelled = true; },
+            };
+        }
         const safeUrl = normalizeCandidateUrl(url, "https://www.google.com/");
         if (!safeUrl) {
             return {

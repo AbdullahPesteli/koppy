@@ -316,6 +316,46 @@ test("built Koppy userscript boots with Tampermonkey-shaped grants and resolves 
     expect(clipboard).toEqual({ count: 1, types: ["image/png"], width: 640, height: 360 });
 });
 
+test("built Koppy copies a normal Google result embedded as data:image without GM networking", async ({ page }) => {
+    await page.route("https://www.google.com/search?**", route => route.fulfill({
+        status: 200,
+        contentType: "text/html",
+        body: `<!doctype html><html><head></head><body><canvas id="seed" width="2" height="2"></canvas><img id="normal-result" width="92" height="92" alt="vaseline jel"><script>const c=document.getElementById('seed'); const x=c.getContext('2d'); x.fillStyle='#7c9cff'; x.fillRect(0,0,2,2); document.getElementById('normal-result').src=c.toDataURL('image/png'); c.remove();</script></body></html>`,
+    }));
+    await page.goto("https://www.google.com/search?q=vaseline+jel");
+    await page.evaluate(() => {
+        const values = new Map();
+        window.GM_getValue = (key, fallback) => values.has(key) ? values.get(key) : fallback;
+        window.GM_setValue = (key, value) => values.set(key, value);
+        window.GM_deleteValue = key => values.delete(key);
+        window.GM_addStyle = css => { const style = document.createElement("style"); style.textContent = css; document.head.appendChild(style); return style; };
+        window.GM_openInTab = () => null;
+        window.GM_setClipboard = () => {};
+        window.GM_registerMenuCommand = () => {};
+        window.GM_notification = () => {};
+        window.GM_download = () => {};
+        window.GM_xmlhttpRequest = () => { throw new Error("embedded previews must not fetch through GM"); };
+        window.GM = { getValue: async (key, fallback) => window.GM_getValue(key, fallback), setValue: async (key, value) => window.GM_setValue(key, value), deleteValue: async key => window.GM_deleteValue(key), addStyle: window.GM_addStyle, openInTab: window.GM_openInTab, setClipboard: window.GM_setClipboard, registerMenuCommand: window.GM_registerMenuCommand, notification: window.GM_notification, xmlHttpRequest: window.GM_xmlhttpRequest };
+        window.unsafeWindow = window;
+    });
+    const built = fs.readFileSync(distPath, "utf8");
+    expect(await page.evaluate(source => {
+        try { new Function(source).call(window); return null; } catch (error) { return String(error && error.stack || error); }
+    }, built)).toBeNull();
+    await page.hover("#normal-result");
+    await page.keyboard.press("Meta+C");
+    await expect(page.locator("#koppy-copy-toast")).toContainText("Önizleme kopyalandı: 2×2");
+    const clipboard = await page.evaluate(async () => {
+        const items = await navigator.clipboard.read();
+        const blob = await items[0].getType("image/png");
+        const bitmap = await createImageBitmap(blob);
+        const result = { count: items.length, types: items[0].types, width: bitmap.width, height: bitmap.height };
+        bitmap.close();
+        return result;
+    });
+    expect(clipboard).toEqual({ count: 1, types: ["image/png"], width: 2, height: 2 });
+});
+
 test("built Koppy userscript copies a visible QuickHover image on Wikipedia", async ({ page }) => {
     await page.route("https://en.wikipedia.org/wiki/Example", route => route.fulfill({
         status: 200,

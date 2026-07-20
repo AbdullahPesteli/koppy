@@ -63,6 +63,7 @@
         let statusMessage = "Son Kopyalar tutulur · ▣ rozeti gerçek çoklu panoya yazar";
         let statusError = false;
         let isPinned = false;
+        let toolsExpanded = false;
         let drag;
         let stackState = typeof settings.getStackState === "function"
             ? settings.getStackState()
@@ -121,7 +122,7 @@
             const title = create(doc, "div", "title");
             title.title = "Sürükleyerek konumlandır";
             title.append(create(doc, "span", "mark", "K"), create(doc, "div", "title-copy"));
-            title.lastChild.append(create(doc, "strong", "", "Canlı Kontrol"), create(doc, "small", "", "değişiklikler anında kaydolur"));
+            title.lastChild.append(create(doc, "strong", "", "Kontrol Merkezi"), create(doc, "small", "", "canlı ayarlar ve araçlar"));
             title.addEventListener("pointerdown", beginDrag);
             const recentCopies = stackState.count >= 2
                 ? create(doc, "button", "recent-copies", "Son " + stackState.count)
@@ -243,6 +244,42 @@
             previewCard.appendChild(sizeGroup);
             panel.appendChild(previewCard);
 
+            const toolsCard = card("Diğer araçlar", "Bu site için hızlı eylemler.");
+            const tools = create(doc, "div", "segmented utilities");
+            const addTool = (label, title, action) => {
+                if (typeof action !== "function") return;
+                const button = create(doc, "button", "text-button", label);
+                button.type = "button";
+                button.title = title;
+                button.addEventListener("click", event => {
+                    if (!isUserEvent(event)) return;
+                    Promise.resolve(action()).then(result => {
+                        if (result === false) setStatus(label + " için uygun içerik yok", true);
+                        else { setStatus(title); render(); }
+                    }).catch(() => setStatus(label + " açılamadı", true));
+                });
+                tools.appendChild(button);
+            };
+            addTool("Galeri", "Galeri aç", settings.openGallery);
+            addTool("Birleştir", "Açık görselleri birleştir", settings.openStitcher);
+            addTool(typeof settings.isFloatBarHidden === "function" && settings.isFloatBarHidden() ? "Simgeyi göster" : "Simgeyi gizle", "Bu sitede araç çubuğu görünürlüğünü değiştir", settings.toggleFloatBar);
+            addTool(typeof settings.areShortcutsDisabled === "function" && settings.areShortcutsDisabled() ? "Kısayolları aç" : "Kısayolları kapat", "Bu sitede kısayolları değiştir", settings.toggleShortcuts);
+            addTool("Tanı", "Tanı özetini panoya kopyala", settings.copyDiagnostics);
+            if (tools.childElementCount) {
+                const toolsToggle = create(doc, "button", "tools-toggle", toolsExpanded ? "Diğer araçları gizle" : "Diğer araçlar · " + tools.childElementCount);
+                toolsToggle.type = "button";
+                toolsToggle.addEventListener("click", event => {
+                    if (!isUserEvent(event)) return;
+                    toolsExpanded = !toolsExpanded;
+                    render();
+                });
+                panel.appendChild(toolsToggle);
+                if (toolsExpanded) {
+                    toolsCard.appendChild(tools);
+                    panel.appendChild(toolsCard);
+                }
+            }
+
             const footer = create(doc, "footer", "footer");
             if (typeof settings.openUpdate === "function") {
                 const update = create(doc, "button", "update", "Koppy’yi güncelle  ↗");
@@ -298,7 +335,7 @@
                 button { appearance: none; font: inherit; color: inherit; cursor: pointer; } .icon { width: 30px; height: 30px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #aab4c2; font-size: 22px; line-height: 1; } .icon:hover { background: #171c25; border-color: #2a3340; color: #f4f7fb; } .pin, .recent-copies { min-width: 55px; height: 30px; margin-right: 4px; padding: 0 7px; border: 1px solid #2a3340; border-radius: 8px; background: transparent; color: #aab4c2; font-size: 11px; font-weight: 650; } .pin:hover, .recent-copies:hover { color: #f4f7fb; border-color: #52647c; background: #171c25; } .recent-copies { color: #dbe5ff; background: #1a2336; border-color: #40547c; } .stack-clear { width: 24px; height: 30px; margin: 0 2px 0 -4px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: #ff9daa; font-size: 18px; line-height: 1; } .stack-clear:hover { background: rgba(255,113,133,.12); color: #ffd5dc; }
                 .card { padding: 14px; border-bottom: 1px solid #252e3a; } h2 { margin: 0; font-size: 12px; letter-spacing: .01em; } p { margin: 3px 0 10px; color: #aab4c2; font-size: 11px; }
                 .segmented { display: grid; gap: 5px; padding: 4px; border-radius: 10px; background: #0e1218; border: 1px solid #2a3340; } .segmented.four { grid-template-columns: repeat(4, 1fr); } .segmented.sizes { grid-template-columns: 1.35fr 1fr 1fr; }
-                .segmented button { min-height: 34px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: #aab4c2; } .segmented button:hover { color: #f4f7fb; background: #171c25; } .segmented button[aria-pressed="true"] { color: #fff; background: #263557; border-color: #6281e8; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+                .segmented button { min-height: 34px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: #aab4c2; } .segmented button:hover { color: #f4f7fb; background: #171c25; } .segmented button[aria-pressed="true"] { color: #fff; background: #263557; border-color: #6281e8; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); } .tools-toggle { width: calc(100% - 28px); min-height: 30px; margin: 0 14px; border: 1px solid #2a3340; border-radius: 8px; background: transparent; color: #aab4c2; text-align: left; padding: 0 10px; font: 600 11px/1 -apple-system, BlinkMacSystemFont, sans-serif; } .tools-toggle:hover { color: #f4f7fb; border-color: #52647c; background: #171c25; } .utilities { display: flex; flex-wrap: wrap; gap: 3px; } .utilities .text-button { flex: 1 1 92px; min-height: 30px; border: 1px solid #2a3340; }
                 .key { font-size: 17px !important; font-weight: 650; } .text-button { padding: 0 6px; font-size: 11px; }
                 .position-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; } .position { position: relative; height: 38px; border: 1px solid #2a3340; border-radius: 8px; background: #0e1218; } .position:hover { border-color: #52647c; background: #171c25; } .position[aria-pressed="true"] { border-color: #6281e8; background: #202d49; } .position-dot { position: absolute; width: 7px; height: 7px; border-radius: 999px; background: #778393; } .position[aria-pressed="true"] .position-dot { background: #9db4ff; box-shadow: 0 0 0 3px rgba(124,156,255,.18); }
                 .position[data-position="top left"] .position-dot { left: 7px; top: 7px; } .position[data-position="top center"] .position-dot { left: calc(50% - 3px); top: 7px; } .position[data-position="top right"] .position-dot { right: 7px; top: 7px; } .position[data-position="bottom left"] .position-dot { left: 7px; bottom: 7px; } .position[data-position="bottom center"] .position-dot { left: calc(50% - 3px); bottom: 7px; } .position[data-position="bottom right"] .position-dot { right: 7px; bottom: 7px; }

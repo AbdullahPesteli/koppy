@@ -1,6 +1,6 @@
 # Koppy — Durum
 
-**Sürüm:** 0.5.6
+**Sürüm:** 0.5.7
 **Lisans:** MIT
 **Dağıtım:** `dist/Koppy.user.js` üzerinden Tampermonkey
 
@@ -11,6 +11,7 @@
 - Kopyalama, mümkünse QuickHover'ın süzülen preview panelinde ince ilerleme çizgisi ve çözünürlüklü başarı bilgisi verir; küçük kaynak görsel yalnız ince hedef çerçevesi taşır. Metin kopyalamayı bozmaz.
 - QuickHover önizlemesi boş boyut ayarında ekranı kaplamak yerine yaklaşık ekranın %72'sine sığar; elle girilen sınır korunur.
 - Tampermonkey menüsündeki **Koppy Canlı Kontrol**, sık kullanılan modifier, FloatBar konumu ve preview boyutunu küçük bir panelden gerçek davranışa anında uygular. Panel üst sağda açılır, başlığından sürüklenebilir; **sabitle** açıkken sayfada deneme yaparken kapanmaz. Aynı paneldeki **Koppy’yi güncelle** eylemi Tampermonkey güncelleme sayfasını doğrudan açar.
+- Tampermonkey açılır menüsü tek **Koppy · Kontrol Merkezi** girişine indirildi; galeri, tüm ayarlar ve güncelleme panel içinden açılır. Normal Google web sonuçlarının yalnız gömülü `data:image` önizlemesi verdiği kartlarda Koppy, bu görünür pikselleri yerelde çözüp dürüstçe **Önizleme kopyalandı** olarak panoya yazar; ağ isteği yapmaz.
 - **Koppy Bridge**, `▣ N` tıklanınca tutulan PNG'leri macOS panosuna ayrı native öğeler olarak yazar; başarı Bridge yanıtından sonra `N görsel panoda · tek ⌘V` diye bildirilir. LaunchAgent bu Mac'te kurulu; yalnız `127.0.0.1:47651` dinler, CORS vermez, web trafiğini/cookie'leri/panodaki mevcut veriyi okumaz ve 10 PNG / 150 MB sınırını uygular.
 - **Son Kopyalar**, normal `Cmd+C` sonucunu değiştirmez: her basış macOS panosuna yalnız son PNG’yi yazar, aynı PNG bu sekmede en fazla 10 görsel / 150 MB sınırında tutulur. İkinci kopyadan sonra mouse yanında `▣ N` rozeti görünür. Mouse ondan uzaklaşınca yumuşak companion takibi yapar; rozete doğru yönelince frenler, sabitlenir ve 44×36 px tıklanabilir hedefe dönüşür. Hover'da daha parlak, %10 büyük halo alır; mouse rozeti bırakır bırakmaz yeni mouse konumunun yanına geri gelir. Tıklandığında liste seçilir; çoklu görüntüyü ayrı native pano öğeleri olarak yazmak için hâlâ opt-in Koppy Bridge gerekir. Canlı Kontrol yalnız erişilebilir yedek olarak `Son N` ve `×` gösterir; `×` sistem panosuna dokunmaz.
 - Ayar arayüzü sandbox'lıdır; 91 mevcut Picviewer ayarının saklama sözleşmesini korur.
@@ -76,3 +77,4 @@
 - 0.5.4: Firefox/Zen'in `createImageBitmap()` ile çözemediği `image/svg+xml` için blob-URL `<img>` → canvas → `image/png` fallback'i eklendi. SVG bitmap reddi fixture'ı bu yolu ve geçici URL'nin bırakılmasını doğrular.
 - 0.5.5: Kopya geri bildirimi artık ilişkisiz açık QuickHover penceresine sıçramaz; gerçek kaynak görselin üzerinde kalır. Son Kopyalar aynı kaynak/ebat yeniden denendiğinde şişmez, normal pano kopyası yine yapılır. 18 px üzerindeki küçük gerçek görseller de hedef olur. Tarayıcıdaki yalnız terminal, redakte tanı olayları eşlenmiş loopback Bridge günlüğüne aktarılır; böylece sonraki hata yerelden doğrudan ayrıştırılabilir.
 - 0.5.6: Bridge modülünün hata etiketi ana sürümle hizalandı. Zen/Tampermonkey'de modern `GM.xmlHttpRequest` loopback'e ulaşamazsa, aynı sınırlı isteği callback tabanlı `GM_xmlhttpRequest` ile bir kez yeniden dener; böylece iki Tampermonkey taşıması da kullanılır.
+- 0.5.7: Düz Google arama sonuçlarındaki 92×92 gömülü `data:image` ürün önizlemeleri artık dış URL beklenmeden yalnız yerelde çözülüp PNG olarak kopyalanır; görünür önizleme olduğu açıkça etiketlenir. Tampermonkey'nin düz menüsü de tek Kontrol Merkezi girişine indirildi.
