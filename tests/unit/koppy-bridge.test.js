@@ -83,6 +83,28 @@ test("Koppy Bridge falls back to Tampermonkey's callback transport when modern l
     assert.equal(legacyCalls, 1);
 });
 
+test("Koppy Bridge accepts a Promise returned from the legacy-looking transport alias", async t => {
+    const previous = global.GM;
+    t.after(() => {
+        if (previous === undefined) delete global.GM;
+        else global.GM = previous;
+    });
+    global.GM = { xmlHttpRequest() { return Promise.reject(new Error("network refused")); } };
+    let aliasCalls = 0;
+    const bridge = KoppyBridge.create({
+        Blob,
+        getValue: () => "p".repeat(43),
+        gmRequest(options) {
+            aliasCalls += 1;
+            assert.equal(typeof options.onload, "function");
+            return Promise.resolve({ status: 200, responseText: JSON.stringify({ ok: true, count: 2 }) });
+        },
+    });
+    const png = new Blob([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], { type: "image/png" });
+    assert.deepEqual(await bridge.writeImages([{ blob: png }, { blob: png }]), { count: 2 });
+    assert.equal(aliasCalls, 1);
+});
+
 test("Koppy Bridge records redacted transport facts and performs one bounded recovery", async t => {
     const previous = global.GM;
     t.after(() => {

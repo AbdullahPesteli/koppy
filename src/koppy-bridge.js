@@ -9,7 +9,7 @@
     // executed in Tampermonkey's isolated world, so a page never receives the
     // pairing secret or the response body. The helper also sends no CORS header.
     const ORIGIN = "http://127.0.0.1:47651";
-    const SCRIPT_VERSION = "0.5.8";
+    const SCRIPT_VERSION = "0.5.9";
     const TOKEN_KEY = "koppy.bridge.token.v1";
     const MAX_ITEMS = 10;
     const MAX_BYTES = 150 * 1024 * 1024;
@@ -17,7 +17,7 @@
     const DIAGNOSTICS_TYPE = "application/vnd.koppy.diagnostics+json";
 
     function error(message, code) {
-        const output = new Error("Koppy Bridge v" + SCRIPT_VERSION + ": " + message);
+        const output = new Error("Koppy Bridge: " + message);
         output.koppyCode = code || "bridge-failed";
         return output;
     }
@@ -122,26 +122,39 @@
                 settled = true;
                 fn(value);
             };
-            try {
-                gmRequest(Object.assign({}, options, {
-                    onload: response => {
-                        const status = Number(response && response.status) || 0;
-                        if (status < 200 || status >= 300) {
-                            mark("bridge_request_failed", { transport: "legacy", status, errorKind: "http" });
-                            settle(reject, error(status ? "yerel yardımcı HTTP " + status + " döndü" : "yerel yardımcı yanıt vermedi", "bridge-http-" + status));
-                            return;
-                        }
-                        mark("bridge_request_ok", { transport: "legacy", status });
-                        settle(resolve, response);
-                    },
-                    onerror: () => { mark("bridge_request_failed", { transport: "legacy", errorKind: "network", errorCode: "bridge-unreachable" }); settle(reject, error("yerel yardımcıya bağlanılamadı", "bridge-unreachable")); },
-                    ontimeout: () => { mark("bridge_request_failed", { transport: "legacy", errorKind: "timeout", errorCode: "bridge-timeout" }); settle(reject, error("yerel yardımcı zaman aşımına uğradı", "bridge-timeout")); },
-                    onabort: () => { mark("bridge_request_failed", { transport: "legacy", errorKind: "aborted", errorCode: "bridge-aborted" }); settle(reject, error("yerel yardımcı isteği iptal edildi", "bridge-aborted")); },
-                }));
-            } catch (cause) {
+            const handleResponse = response => {
+                if (settled) return;
+                const status = Number(response && response.status) || 0;
+                if (status < 200 || status >= 300) {
+                    mark("bridge_request_failed", { transport: "legacy", status, errorKind: "http" });
+                    settle(reject, error(status ? "yerel yardımcı HTTP " + status + " döndü" : "yerel yardımcı yanıt vermedi", "bridge-http-" + status));
+                    return;
+                }
+                mark("bridge_request_ok", { transport: "legacy", status });
+                settle(resolve, response);
+            };
+            const handleFailure = cause => {
+                if (settled) return;
                 const failure = transportFailure(cause);
                 mark("bridge_request_failed", { transport: "legacy", errorKind: failure.kind, errorCode: failure.code });
                 settle(reject, error(failure.message, failure.code));
+            };
+            try {
+                const returned = gmRequest(Object.assign({}, options, {
+                    onload: handleResponse,
+                    onerror: () => handleFailure(new Error("network refused")),
+                    ontimeout: () => handleFailure(new Error("timeout")),
+                    onabort: () => handleFailure(new Error("aborted")),
+                }));
+                // Zen/Tampermonkey installations can expose the Promise form
+                // through the legacy-looking alias. Accept both contracts: if
+                // callbacks arrive they win; if they are ignored, settle from
+                // the returned Promise instead of leaving the batch stuck.
+                if (returned && typeof returned.then === "function") {
+                    Promise.resolve(returned).then(handleResponse, handleFailure);
+                }
+            } catch (cause) {
+                handleFailure(cause);
             }
         });
     }
