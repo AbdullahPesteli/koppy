@@ -46,7 +46,7 @@ const moduleSource = `${settingsModuleSource}\n\n${diagnosticsModuleSource}\n\n 
             },
             onOpenState: () => { isConfigOpen = true; },
             onCloseState: () => { isConfigOpen = false; },
-});\n\n${controlDeckModuleSource}\n\n${previewModuleSource}\n\n${bridgeModuleSource}\n\n${googleModuleSource}\n\n        const koppyBridge = globalThis.KoppyBridge.create({\n            gmRequest: _GM_xmlhttpRequest,\n            getValue: _GM_getValue,\n            setValue: _GM_setValue,\n            Blob: Blob,\n            diagnostics: globalThis.KoppyDiagnostics,\n        });\n        const koppyCreateController = globalThis.KoppyGoogleCopy.createController;\n        globalThis.KoppyGoogleCopy.createController = dependencies => koppyCreateController(Object.assign({}, dependencies, {\n            diagnostics: globalThis.KoppyDiagnostics,\n            onRecentCopiesAccepted: items => koppyBridge.writeImages(items),\n        }));`;
+});\n\n${controlDeckModuleSource}\n\n${previewModuleSource}\n\n${bridgeModuleSource}\n\n${googleModuleSource}\n\n        const koppyBridge = globalThis.KoppyBridge.create({ diagnostics: globalThis.KoppyDiagnostics });\n        const koppyCreateController = globalThis.KoppyGoogleCopy.createController;\n        globalThis.KoppyGoogleCopy.createController = dependencies => koppyCreateController(Object.assign({}, dependencies, {\n            diagnostics: globalThis.KoppyDiagnostics,\n            onRecentCopiesAccepted: items => koppyBridge.writeImages(items),\n        }));`;
 const runtimeHashes = new Map(fs.readFileSync(path.join(runtimeDir, "SHA256SUMS"), "utf8").trim().split("\n").map(line => {
     const match = line.match(/^([0-9a-f]{64})\s+(.+)$/);
     if (!match) throw new Error(`Invalid runtime hash line: ${line}`);
@@ -75,7 +75,7 @@ const replacements = new Map([
     ["// @name:pt-BR           Picviewer CE+", "// @name:pt-BR           Koppy"],
     ["// @name:ru              Picviewer CE+", "// @name:ru              Koppy"],
     ["// @author               NLF && ywzhaiqi && hoothin", "// @author               NLF && ywzhaiqi && hoothin; Koppy fork by pestly"],
-    ["// @version              2026.2.6.1", "// @version              0.5.9"],
+    ["// @version              2026.2.6.1", "// @version              0.6.0"],
     ["// @namespace            https://github.com/hoothin/UserScripts", "// @namespace            https://github.com/AbdullahPesteli/koppy"],
     ["// @homepage             https://pv.hoothin.com/", "// @homepage             https://github.com/AbdullahPesteli/koppy"],
     ["// @supportURL           https://github.com/hoothin/UserScripts/issues", "// @supportURL           https://github.com/AbdullahPesteli/koppy/issues"],
@@ -91,12 +91,6 @@ const koppyUpdateMetadata = "// @updateURL            " + updateUrl + "\n// @dow
 const koppySupportUrl = "// @supportURL           https://github.com/AbdullahPesteli/koppy/issues";
 if (!source.includes(koppySupportUrl)) throw new Error("Koppy support URL marker missing after metadata replacement");
 source = source.replace(koppySupportUrl, koppySupportUrl + "\n" + koppyUpdateMetadata);
-
-// Tampermonkey on Firefox/Zen can reject loopback requests despite @connect *.
-// Keep this narrow, explicit declaration for Koppy Bridge's local-only helper.
-const connectWildcard = "// @connect              *";
-if (!source.includes(connectWildcard)) throw new Error("Upstream @connect wildcard marker missing");
-source = source.replace(connectWildcard, connectWildcard + "\n// @connect              127.0.0.1\n// @connect              localhost");
 
 const remoteRequires = [
     "// @require              https://update.greasyfork.org/scripts/6158/23710/GM_config%20CN.js",
@@ -305,16 +299,12 @@ if (!source.includes(openPrefsSecureEntry)) throw new Error("Upstream openPrefs 
 source = source.replace(openPrefsSecureEntry, openPrefsSecureEntry
     + "\n            globalThis.KoppySettingsUI.openSecure();\n            return;");
 const integration = `${moduleSource}\n\n        let koppyDocumentPreview = null;\n        let koppyDocumentPreviewUrl = null;\n        const koppyHideDocumentPreview = () => {\n            const preview = koppyDocumentPreview;\n            koppyDocumentPreview = null;\n            if (preview && !preview.removed) preview.remove();\n            if (koppyDocumentPreviewUrl) {\n                URL.revokeObjectURL(koppyDocumentPreviewUrl);\n                koppyDocumentPreviewUrl = null;\n            }\n            if (uniqueImgWin === preview || (uniqueImgWin && uniqueImgWin.removed)) uniqueImgWin = null;\n        };\n        const koppyShowDocumentPreview = ({ blob, element, pointer }) => {\n            if (!blob || !element || !pointer || typeof URL.createObjectURL !== "function") return false;\n            koppyHideDocumentPreview();\n            const url = URL.createObjectURL(blob);\n            const previewImage = document.createElement("img");\n            const data = { src: url, imgSrc: url, img: element, type: "koppy-document", noActual: true };\n            uniqueImgWinInitX = pointer.x;\n            uniqueImgWinInitY = pointer.y;\n            const preview = new ImgWindowC(previewImage, data, null, null, true);\n            koppyDocumentPreview = preview;\n            koppyDocumentPreviewUrl = url;\n            preview.imgWindow.classList.add("preview");\n            preview.imgWindow.dataset.koppyDocumentPreview = "true";\n            preview.imgWindow.addEventListener("pv-removeImgWindow", () => {\n                if (koppyDocumentPreview === preview) koppyDocumentPreview = null;\n                if (koppyDocumentPreviewUrl === url) {\n                    URL.revokeObjectURL(url);\n                    koppyDocumentPreviewUrl = null;\n                }\n                if (uniqueImgWin === preview) uniqueImgWin = null;\n            }, { once: true });\n            uniqueImgWin = preview;\n            return true;\n        };\n        globalThis.KoppyGoogleCopy.createController({\n            document: document,\n            window: window,\n            location: location,\n            navigator: navigator,\n            ClipboardItem: typeof ClipboardItem === "undefined" ? null : ClipboardItem,\n            gmRequest: _GM_xmlhttpRequest,\n            resolvePic: findPic,\n            isPreviewGesture: event => checkPreview(event),\n            showDocumentPreview: koppyShowDocumentPreview,\n            hideDocumentPreview: koppyHideDocumentPreview,\n        }).start();\n        globalThis.KoppyPreviewFit.install({ ImgWindowC: ImgWindowC, prefs: prefs, window: window });\n\n`;
-const bridgeValueAliases = `        const _GM_getValue = typeof GM_getValue === "function" ? GM_getValue : () => null;
-        const _GM_setValue = typeof GM_setValue === "function" ? GM_setValue : () => {};
+const diagnosticsPersistence = `        const _GM_setValue = typeof GM_setValue === "function" ? GM_setValue : () => {};
         if (globalThis.KoppyDiagnostics && typeof globalThis.KoppyDiagnostics.configure === "function") {
             globalThis.KoppyDiagnostics.configure({
                 persist: snapshot => _GM_setValue("koppy.diagnostics.v1", JSON.stringify(snapshot)),
-                report: snapshot => globalThis.KoppyBridgeReporter && globalThis.KoppyBridgeReporter(snapshot),
             });
         }
-`;
-const diagnosticReporterIntegration = `        globalThis.KoppyBridgeReporter = snapshot => koppyBridge.reportDiagnostics(snapshot).catch(() => {});
 `;
 const controlDeckIntegration = `        const koppyOpenUpdate = () => _GM_openInTab(${JSON.stringify(updateUrl)}, {active:true});
         const koppyCopyDiagnostics = () => {
@@ -375,7 +365,7 @@ const controlDeckIntegration = `        const koppyOpenUpdate = () => _GM_openIn
         if (koppyControlDeck) _GM_registerMenuCommand("Koppy · Kontrol Merkezi", () => koppyControlDeck.toggle());
 
 `;
-source = source.replace(marker, bridgeValueAliases + integration + controlDeckIntegration + diagnosticReporterIntegration + marker);
+source = source.replace(marker, diagnosticsPersistence + integration + controlDeckIntegration + marker);
 
 fs.mkdirSync(outputDir, { recursive: true });
 fs.writeFileSync(outputPath, source);

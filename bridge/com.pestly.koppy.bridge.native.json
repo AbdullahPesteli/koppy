@@ -1,0 +1,7 @@
+{
+  "name": "com.pestly.koppy.bridge.native",
+  "description": "Koppy Bridge Native Messaging host",
+  "path": "/Users/pestly/Library/Application Support/Koppy Bridge/KoppyNativeHost",
+  "type": "stdio",
+  "allowed_extensions": ["koppy-bridge@pestly.local"]
+}

@@ -1,157 +1,72 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const KoppyBridge = require("../../src/koppy-bridge.js");
-const KoppyDiagnostics = require("../../src/koppy-diagnostics.js");
 
-test("Koppy Bridge pairs in the Tampermonkey world and frames independent PNGs", async () => {
-    const calls = [];
-    let stored = null;
-    const bridge = KoppyBridge.create({
-        Blob,
-        getValue: () => stored,
-        setValue: (_key, value) => { stored = value; },
-        gmRequest(options) {
-            calls.push(options);
-            queueMicrotask(async () => {
-                if (options.method === "GET") {
-                    options.onload({ status: 200, responseText: JSON.stringify({ ok: true, token: "x".repeat(43) }) });
-                    return;
-                }
-                assert.equal(options.url, KoppyBridge.ORIGIN + "/v1/images");
-                assert.equal(options.headers.Authorization, "Bearer " + "x".repeat(43));
-                assert.equal(options.headers["Content-Type"], KoppyBridge.FRAME_TYPE);
-                const frame = new Uint8Array(await options.data.arrayBuffer());
-                assert.equal(new DataView(frame.buffer, frame.byteOffset, frame.byteLength).getUint32(0, false), 8);
-                assert.equal(new DataView(frame.buffer, frame.byteOffset + 12, frame.byteLength - 12).getUint32(0, false), 8);
-                options.onload({ status: 200, responseText: JSON.stringify({ ok: true, count: 2 }) });
+function png() { return new Blob([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], { type: "image/png" }); }
+
+function fakeWindow() {
+    const listeners = new Set();
+    return {
+        addEventListener(type, fn) { if (type === "message") listeners.add(fn); },
+        removeEventListener(type, fn) { if (type === "message") listeners.delete(fn); },
+        postMessage(data) {
+            if (data.type === "write") queueMicrotask(() => {
+                for (const fn of listeners) fn({ source: this, data: { channel: KoppyBridge.CHANNEL, type: "result", id: data.id, ok: true, count: data.images.length } });
             });
-            return { abort() {} };
         },
-    });
-    const pngA = new Blob([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], { type: "image/png" });
-    const pngB = new Blob([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], { type: "image/png" });
-    assert.deepEqual(await bridge.writeImages([{ blob: pngA }, { blob: pngB }]), { count: 2 });
-    assert.equal(calls.length, 2);
-    assert.equal(stored, "x".repeat(43));
-});
-
-test("Koppy Bridge refuses an invalid or oversized browser-side batch before networking", async () => {
-    const bridge = KoppyBridge.create({ Blob, gmRequest() { throw new Error("ağa çıkmamalı"); } });
-    await assert.rejects(bridge.frameImages([{ blob: new Blob(["not-png"], { type: "image/jpeg" }) }, { blob: new Blob(["x"], { type: "image/png" }) }]), /yalnız hazırlanmış PNG/);
-    await assert.rejects(bridge.frameImages([{ blob: new Blob(["x"], { type: "image/png" }) }]), /en az iki görsel/);
-});
-
-test("Koppy Bridge prefers Tampermonkey's modern Firefox transport", async t => {
-    const previous = global.GM;
-    t.after(() => {
-        if (previous === undefined) delete global.GM;
-        else global.GM = previous;
-    });
-    let modernCalls = 0;
-    global.GM = {
-        xmlHttpRequest(options) {
-            modernCalls += 1;
-            if (options.method === "GET") return Promise.resolve({ status: 200, responseText: JSON.stringify({ ok: true, token: "m".repeat(43) }) });
-            return Promise.resolve({ status: 200, responseText: JSON.stringify({ ok: true, count: 2 }) });
+        arm(token = "a".repeat(32)) {
+            for (const fn of listeners) fn({ source: this, data: { channel: KoppyBridge.CHANNEL, type: "armed", token, expires: Date.now() + 3000 } });
         },
+        listenerCount() { return listeners.size; },
     };
-    const bridge = KoppyBridge.create({ Blob, gmRequest() { throw new Error("legacy yol kullanılmamalı"); } });
-    const png = new Blob([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], { type: "image/png" });
-    assert.deepEqual(await bridge.writeImages([{ blob: png }, { blob: png }]), { count: 2 });
-    assert.equal(modernCalls, 2);
+}
+
+test("Koppy Bridge waits for a Native Messaging completion before resolving", async () => {
+    const win = fakeWindow();
+    const bridge = KoppyBridge.create({ window: win, crypto: { getRandomValues(bytes) { bytes.fill(12); } } });
+    win.arm();
+    assert.deepEqual(await bridge.writeImages([{ blob: png() }, { blob: png() }]), { count: 2 });
 });
 
-test("Koppy Bridge falls back to Tampermonkey's callback transport when modern loopback fails", async t => {
-    const previous = global.GM;
-    t.after(() => {
-        if (previous === undefined) delete global.GM;
-        else global.GM = previous;
-    });
-    global.GM = { xmlHttpRequest() { return Promise.reject(new Error("network refused")); } };
-    let legacyCalls = 0;
-    const bridge = KoppyBridge.create({
-        Blob,
-        getValue: () => "f".repeat(43),
-        gmRequest(options) {
-            legacyCalls += 1;
-            queueMicrotask(() => options.onload({ status: 200, responseText: JSON.stringify({ ok: true, count: 2 }) }));
-            return { abort() {} };
-        },
-    });
-    const png = new Blob([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], { type: "image/png" });
-    assert.deepEqual(await bridge.writeImages([{ blob: png }, { blob: png }]), { count: 2 });
-    assert.equal(legacyCalls, 1);
+test("Koppy Bridge refuses invalid batches before contacting the companion", async () => {
+    const win = fakeWindow();
+    const bridge = KoppyBridge.create({ window: win, crypto: { getRandomValues(bytes) { bytes.fill(1); } } });
+    await assert.rejects(bridge.writeImages([{ blob: png() }]), /en az iki görsel/);
+    await assert.rejects(bridge.writeImages([{ blob: new Blob(["x"], { type: "image/jpeg" }) }, { blob: png() }]), /yalnız hazırlanmış PNG/);
+    await assert.rejects(bridge.writeImages([{ blob: new Blob([], { type: "image/png" }) }, { blob: png() }]), /boş görsel/);
 });
 
-test("Koppy Bridge accepts a Promise returned from the legacy-looking transport alias", async t => {
-    const previous = global.GM;
-    t.after(() => {
-        if (previous === undefined) delete global.GM;
-        else global.GM = previous;
-    });
-    global.GM = { xmlHttpRequest() { return Promise.reject(new Error("network refused")); } };
-    let aliasCalls = 0;
-    const bridge = KoppyBridge.create({
-        Blob,
-        getValue: () => "p".repeat(43),
-        gmRequest(options) {
-            aliasCalls += 1;
-            assert.equal(typeof options.onload, "function");
-            return Promise.resolve({ status: 200, responseText: JSON.stringify({ ok: true, count: 2 }) });
-        },
-    });
-    const png = new Blob([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], { type: "image/png" });
-    assert.deepEqual(await bridge.writeImages([{ blob: png }, { blob: png }]), { count: 2 });
-    assert.equal(aliasCalls, 1);
+test("Koppy Bridge replaces a previous page listener instead of leaking it", async () => {
+    const win = fakeWindow();
+    const first = KoppyBridge.create({ window: win, crypto: { getRandomValues(bytes) { bytes.fill(3); } } });
+    const second = KoppyBridge.create({ window: win, crypto: { getRandomValues(bytes) { bytes.fill(4); } } });
+    assert.equal(win.listenerCount(), 1);
+    await assert.rejects(first.writeImages([{ blob: png() }, { blob: png() }]), /artık etkin değil/);
+    win.arm();
+    assert.deepEqual(await second.writeImages([{ blob: png() }, { blob: png() }]), { count: 2 });
+    second.dispose();
+    assert.equal(win.listenerCount(), 0);
 });
 
-test("Koppy Bridge records redacted transport facts and performs one bounded recovery", async t => {
-    const previous = global.GM;
-    t.after(() => {
-        if (previous === undefined) delete global.GM;
-        else global.GM = previous;
-    });
-    KoppyDiagnostics.clear();
-    let imageCalls = 0;
-    global.GM = {
-        xmlHttpRequest(options) {
-            if (options.method === "GET" && /\/token$/.test(options.url)) {
-                return Promise.resolve({ status: 200, responseText: JSON.stringify({ ok: true, token: "r".repeat(43) }) });
-            }
-            if (options.method === "GET" && /\/health$/.test(options.url)) return Promise.resolve({ status: 200, responseText: JSON.stringify({ ok: true }) });
-            imageCalls += 1;
-            return imageCalls === 1
-                ? Promise.reject(new Error("network refused http://private.example/secret"))
-                : Promise.resolve({ status: 200, responseText: JSON.stringify({ ok: true, count: 2 }) });
-        },
+test("Koppy Bridge requires a recent trusted companion arm", async () => {
+    const win = fakeWindow();
+    const bridge = KoppyBridge.create({ window: win, crypto: { getRandomValues(bytes) { bytes.fill(1); } } });
+    await assert.rejects(bridge.writeImages([{ blob: png() }, { blob: png() }]), /Companion kurulu veya etkin değil/);
+});
+
+test("Koppy Bridge turns an explicit Native Messaging failure into a visible error", async () => {
+    const win = fakeWindow();
+    win.postMessage = function (data) {
+        if (data.type !== "write") return;
+        queueMicrotask(() => {
+            for (const fn of listeners) fn({ source: this, data: { channel: KoppyBridge.CHANNEL, type: "result", id: data.id, ok: false, error: "yerel yardımcı bulunamadı" } });
+        });
     };
-    const bridge = KoppyBridge.create({ Blob, diagnostics: KoppyDiagnostics });
-    const png = new Blob([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], { type: "image/png" });
-    assert.deepEqual(await bridge.writeImages([{ blob: png }, { blob: png }]), { count: 2 });
-    assert.equal(imageCalls, 2);
-    const trace = JSON.stringify(KoppyDiagnostics.snapshot());
-    assert.match(trace, /bridge_recovery_ok/);
-    assert.doesNotMatch(trace, /private\.example|secret|Bearer|token/);
-});
-
-test("Koppy Bridge forwards only a redacted terminal diagnostic snapshot to the local helper", async t => {
-    const previous = global.GM;
-    t.after(() => {
-        if (previous === undefined) delete global.GM;
-        else global.GM = previous;
-    });
-    let report;
-    global.GM = {
-        xmlHttpRequest(options) {
-            if (/\/token$/.test(options.url)) return Promise.resolve({ status: 200, responseText: JSON.stringify({ ok: true, token: "d".repeat(43) }) });
-            report = JSON.parse(options.data);
-            return Promise.resolve({ status: 200, responseText: JSON.stringify({ ok: true, accepted: 1 }) });
-        },
-    };
-    const bridge = KoppyBridge.create({ Blob });
-    await bridge.reportDiagnostics({ recent: [{
-        event: "copy_failed", errorKind: "decode", status: 415,
-        url: "https://private.example/never-send", token: "never-send", responseText: "never-send",
-    }] });
-    assert.deepEqual(report, { schema: 1, recent: [{ event: "copy_failed", errorKind: "decode", status: 415 }] });
+    // Keep this small custom event target separate from the success fake.
+    const listeners = new Set();
+    win.addEventListener = (_type, fn) => listeners.add(fn);
+    win.arm = token => { for (const fn of listeners) fn({ source: win, data: { channel: KoppyBridge.CHANNEL, type: "armed", token: token || "b".repeat(32), expires: Date.now() + 3000 } }); };
+    const bridge = KoppyBridge.create({ window: win, crypto: { getRandomValues(bytes) { bytes.fill(2); } } });
+    win.arm();
+    await assert.rejects(bridge.writeImages([{ blob: png() }, { blob: png() }]), /yerel yardımcı bulunamadı/);
 });

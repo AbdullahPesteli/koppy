@@ -1,6 +1,6 @@
 {
   "name": "koppy",
-  "version": "0.5.9",
+  "version": "0.6.0",
   "description": "Koppy: Google Images direct-image clipboard fork of Picviewer CE+ for Tampermonkey",
   "license": "MIT",
   "repository": {
@@ -13,8 +13,11 @@
   "homepage": "https://github.com/AbdullahPesteli/koppy#readme",
   "scripts": {
     "build": "node scripts/build.mjs",
+    "companion:build": "zsh scripts/build-companion.sh",
     "clipboard:inspect": "swift scripts/clipboard-inspect.swift",
     "bridge:install": "zsh scripts/install-bridge.sh",
+    "bridge:native:install": "zsh scripts/install-native-companion-host.sh",
+    "bridge:native:selftest": "swiftc bridge/KoppyNativeHost.swift -framework AppKit -o .context/KoppyNativeHost-selftest && .context/KoppyNativeHost-selftest --self-test",
     "bridge:selftest": "swiftc bridge/KoppyBridge.swift -framework AppKit -framework Security -o .context/KoppyBridge-selftest && .context/KoppyBridge-selftest --self-test",
     "test": "node --test tests/unit/*.test.js",
     "test:e2e": "playwright test",

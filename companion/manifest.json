@@ -1,0 +1,17 @@
+{
+  "manifest_version": 2,
+  "name": "Koppy Bridge Companion",
+  "version": "0.6.0",
+  "description": "Koppy'nin çoklu görsellerini macOS panosuna güvenli Native Messaging ile yazar.",
+  "browser_specific_settings": {
+    "gecko": { "id": "koppy-bridge@pestly.local", "strict_min_version": "109.0" }
+  },
+  "permissions": ["nativeMessaging"],
+  "background": { "scripts": ["background.js"] },
+  "content_scripts": [{
+    "matches": ["http://*/*", "https://*/*"],
+    "js": ["content.js"],
+    "run_at": "document_start",
+    "all_frames": false
+  }]
+}
