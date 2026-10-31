@@ -236,14 +236,17 @@
             seen.add(normalized);
             sources.push({ url: normalized, source, isThumbnailFallback: !shouldExcludeThumbnail && isThumbnail });
         };
-        parseSrcset(element && element.getAttribute && element.getAttribute("srcset"), baseUrl)
-            .forEach(candidate => add(candidate.url, "srcset"));
+        // Deterministic order: the largest declared candidate across the <img>
+        // srcset AND every <picture><source> wins, not whichever list is read first.
+        const scored = parseSrcset(element && element.getAttribute && element.getAttribute("srcset"), baseUrl)
+            .map(candidate => ({ url: candidate.url, score: candidate.score, source: "srcset" }));
         const picture = element && element.closest && element.closest("picture");
         if (picture && picture.querySelectorAll) {
             picture.querySelectorAll("source[srcset]").forEach(node => {
-                parseSrcset(node.getAttribute("srcset"), baseUrl).forEach(candidate => add(candidate.url, "picture-srcset"));
+                parseSrcset(node.getAttribute("srcset"), baseUrl).forEach(candidate => scored.push({ url: candidate.url, score: candidate.score, source: "picture-srcset" }));
             });
         }
+        scored.sort((a, b) => b.score - a.score).forEach(candidate => add(candidate.url, candidate.source));
         if (includeDirectSource !== false) {
             add(element && element.currentSrc, "currentSrc");
             add(element && (element.src || (element.getAttribute && element.getAttribute("src"))), "src");
@@ -477,7 +480,7 @@
         documentUrlsFromElement(element, baseUrl).forEach(candidate => add(candidate.url, candidate.source, candidate));
         // This is intentionally last: a resolver, lazy-load field or normal
         // HTTPS src is always more useful than Google's embedded result preview.
-        if (!candidates.length && settings.allowEmbeddedPreview !== false && isNormalGoogleSearchLocation(baseUrl) && String(element.nodeName).toUpperCase() === "IMG") {
+        if (!candidates.length && settings.allowEmbeddedPreview !== false && String(element.nodeName).toUpperCase() === "IMG") {
             const embedded = embeddedImageCandidate(element.currentSrc || element.src || (element.getAttribute && element.getAttribute("src")), element, "embedded-preview");
             if (embedded) candidates.push(embedded);
         }
@@ -1872,11 +1875,13 @@
             }
             setHoveredImage(current.element, true);
             if (!current || !current.candidates.length) {
-                if (!current || !current.isGoogleResult) return { status: "not-applicable" };
+                // On Google pages a non-result image keeps native behaviour; on every
+                // other page a hovered image we cannot resolve must fail visibly.
+                if (!current || (isGoogleImagesLocation(locationLike) && !current.isGoogleResult)) return { status: "not-applicable" };
                 event.preventDefault();
                 if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
                 else if (typeof event.stopPropagation === "function") event.stopPropagation();
-                notify("Koppy: Orijinal görsel adresi bulunamadı", "error");
+                notify("Koppy: kopyalanamadı: kaynak çözülemedi", "error");
                 diagnostic("copy_failed", { flowId: copyFlowId, errorKind: "candidate", errorCode: "candidate-not-found" });
                 return { status: "failed", reason: "candidate-not-found" };
             }
