@@ -6,14 +6,17 @@ import Security
 // Koppy Bridge is intentionally a small, loopback-only process. It accepts
 // framed PNGs from the Tampermonkey sandbox and writes independent pasteboard
 // items. It does not inspect browser traffic, cookies, URLs, or clipboard data.
-private let port: UInt16 = 47651
+private var port: UInt16 = 47651
+private var tokenFileOverride: String? = nil
+private let rateLimitPerMinute = 10
+private var requestTimes: [Date] = []
 private let maxItems = 10
 private let maxBytes = 150 * 1024 * 1024
 private let headerLimit = 16 * 1024
 private let frameContentType = "application/vnd.koppy.images+binary"
 private let diagnosticsContentType = "application/vnd.koppy.diagnostics+json"
-private let clientHeader = "tampermonkey-v1"
-private let bridgeVersion = "0.5.9"
+private let tokenHeader = "x-koppy-token"
+private let bridgeVersion = "0.7.1"
 private var bridgeRequestCount = 0
 private var lastBridgePath = "none"
 private var lastBridgeStatus = 0
@@ -29,6 +32,7 @@ private struct Request {
 private enum BridgeError: Error, LocalizedError {
     case badRequest(String)
     case unauthorized
+    case rateLimited
     case tooLarge
     case invalidImage(String)
 
@@ -36,6 +40,7 @@ private enum BridgeError: Error, LocalizedError {
         switch self {
         case .badRequest(let message): return message
         case .unauthorized: return "yetkilendirme reddedildi"
+        case .rateLimited: return "dakikada en fazla 10 istek"
         case .tooLarge: return "istek boyutu sınırı aşıyor"
         case .invalidImage(let message): return message
         }
@@ -122,12 +127,16 @@ private func requestResult(_ request: Request, status: Int, imageCount: Int? = n
     recordDiagnostic(status >= 200 && status < 300 ? "bridge_request_ok" : "bridge_request_failed", fields: fields)
 }
 
-private func loadOrCreateToken() throws -> String {
-    let tokenURL = try applicationDirectory().appendingPathComponent("token", isDirectory: false)
-    if let existing = try? String(contentsOf: tokenURL, encoding: .utf8)
-        .trimmingCharacters(in: .whitespacesAndNewlines), existing.count >= 32 {
-        return existing
-    }
+private func tokenFileURL() -> URL {
+    if let override = tokenFileOverride { return URL(fileURLWithPath: override) }
+    return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".koppy/bridge-token")
+}
+
+// A fresh random token is generated at every start and written 0600 under a 0700 directory.
+private func createToken() throws -> String {
+    let tokenURL = tokenFileURL()
+    let directory = tokenURL.deletingLastPathComponent()
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
     var bytes = [UInt8](repeating: 0, count: 32)
     guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else {
         throw BridgeError.badRequest("rastgele anahtar üretilemedi")
@@ -136,9 +145,31 @@ private func loadOrCreateToken() throws -> String {
         .replacingOccurrences(of: "+", with: "-")
         .replacingOccurrences(of: "/", with: "_")
         .replacingOccurrences(of: "=", with: "")
-    try Data(token.utf8).write(to: tokenURL, options: .atomic)
-    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: tokenURL.path)
+    try? FileManager.default.removeItem(at: tokenURL)
+    guard FileManager.default.createFile(atPath: tokenURL.path, contents: Data(token.utf8), attributes: [.posixPermissions: 0o600]) else {
+        throw BridgeError.badRequest("token dosyası yazılamadı")
+    }
     return token
+}
+
+private func readStoredToken() -> String? {
+    guard let text = try? String(contentsOf: tokenFileURL(), encoding: .utf8) else { return nil }
+    let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    return value.isEmpty ? nil : value
+}
+
+// Sliding one-minute window. Every non-health request counts, including rejected ones,
+// so token guessing is throttled as well.
+private func allowRequest() -> Bool {
+    let now = Date()
+    requestTimes = requestTimes.filter { now.timeIntervalSince($0) < 60 }
+    if requestTimes.count >= rateLimitPerMinute { return false }
+    requestTimes.append(now)
+    return true
+}
+
+private func tokenMatches(_ request: Request, _ token: String) -> Bool {
+    constantTimeEqual(request.headers[tokenHeader] ?? "", token)
 }
 
 private func constantTimeEqual(_ left: String, _ right: String) -> Bool {
@@ -165,6 +196,7 @@ private func response(_ fd: Int32, status: Int, payload: [String: Any]) {
     case 401: reason = "Unauthorized"
     case 404: reason = "Not Found"
     case 405: reason = "Method Not Allowed"
+    case 429: reason = "Too Many Requests"
     case 413: reason = "Payload Too Large"
     case 415: reason = "Unsupported Media Type"
     default: reason = "Internal Server Error"
@@ -219,7 +251,7 @@ private func readRequest(_ fd: Int32) throws -> Request {
         if data.count - bodyStart > length { throw BridgeError.badRequest("HTTP gövdesi fazla") }
     }
     guard data.count - bodyStart == length else { throw BridgeError.badRequest("HTTP gövdesi geçersiz") }
-    return Request(method: requestLine[0], path: requestLine[1], headers: headers, body: data[bodyStart...])
+    return Request(method: requestLine[0], path: requestLine[1], headers: headers, body: Data(data[bodyStart...]))
 }
 
 private func parseImages(_ body: Data) throws -> [Data] {
@@ -278,15 +310,9 @@ private func handle(_ fd: Int32, token: String) {
         }
         bridgeRequestCount += 1
         lastBridgePath = request.path
-        if request.method == "GET", request.path == "/v1/token" {
-            guard request.headers["x-koppy-client"] == clientHeader else { throw BridgeError.unauthorized }
-            requestResult(request, status: 200)
-            response(fd, status: 200, payload: ["ok": true, "token": token])
-            return
-        }
+        guard allowRequest() else { throw BridgeError.rateLimited }
         if request.path == "/v1/diagnostics" {
-            let auth = request.headers["authorization"] ?? ""
-            guard auth.hasPrefix("Bearer "), constantTimeEqual(String(auth.dropFirst(7)), token) else { throw BridgeError.unauthorized }
+            guard tokenMatches(request, token) else { throw BridgeError.unauthorized }
             if request.method == "GET" {
                 requestResult(request, status: 200)
                 response(fd, status: 200, payload: ["ok": true, "events": recentDiagnostics()])
@@ -307,13 +333,12 @@ private func handle(_ fd: Int32, token: String) {
             response(fd, status: 404, payload: ["ok": false, "error": "bulunamadı"])
             return
         }
+        guard tokenMatches(request, token) else { throw BridgeError.unauthorized }
         guard request.headers["content-type"]?.lowercased() == frameContentType else {
             requestResult(request, status: 415)
             response(fd, status: 415, payload: ["ok": false, "error": "geçersiz içerik türü"])
             return
         }
-        let auth = request.headers["authorization"] ?? ""
-        guard auth.hasPrefix("Bearer "), constantTimeEqual(String(auth.dropFirst(7)), token) else { throw BridgeError.unauthorized }
         let images = try parseImages(request.body)
         try writeToClipboard(images)
         requestResult(request, status: 200, imageCount: images.count)
@@ -322,6 +347,7 @@ private func handle(_ fd: Int32, token: String) {
         let code: Int
         switch bridgeError {
         case .unauthorized: code = 401
+        case .rateLimited: code = 429
         case .tooLarge: code = 413
         default: code = 400
         }
@@ -359,7 +385,7 @@ private func selfTest() -> Int32 {
 }
 
 private func runServer() throws {
-    let token = try loadOrCreateToken()
+    let token = try createToken()
     let fd = socket(AF_INET, SOCK_STREAM, 0)
     guard fd >= 0 else { throw BridgeError.badRequest("socket açılamadı") }
     defer { close(fd) }
@@ -388,6 +414,14 @@ private func runServer() throws {
     }
 }
 
+let arguments = CommandLine.arguments
+if let index = arguments.firstIndex(of: "--port"), index + 1 < arguments.count, let value = UInt16(arguments[index + 1]) { port = value }
+if let index = arguments.firstIndex(of: "--token-file"), index + 1 < arguments.count { tokenFileOverride = arguments[index + 1] }
+if arguments.contains("--print-token") {
+    guard let stored = readStoredToken() else { fputs("Koppy Bridge: token yok (köprü hiç başlatılmadı)\n", stderr); exit(1) }
+    print(stored)
+    exit(0)
+}
 if CommandLine.arguments.contains("--self-test") {
     exit(selfTest())
 }

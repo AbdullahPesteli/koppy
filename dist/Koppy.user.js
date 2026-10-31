@@ -34469,13 +34469,19 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
         .koppy-settings-content.is-searching .section_header_holder.koppy-search-match + .section_header_holder.koppy-search-match { padding-top: 8px !important; }
         .koppy-settings-content.is-searching .section_header_holder .koppy-panel-heading { display: block; margin-bottom: 12px; }
 
-        .koppy-card {
+        .koppy-card, .koppy-bridge-card {
             margin: 0 0 14px;
             overflow: hidden;
             border: 1px solid var(--k-border);
             border-radius: 11px;
             background: var(--k-surface);
         }
+        .koppy-bridge-card .koppy-bridge-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 16px; }
+        .koppy-bridge-status { flex: 1 1 100%; font-weight: 600; }
+        .koppy-bridge-status[data-bridge-state="running"] { color: #6fcf97; }
+        .koppy-bridge-status[data-bridge-state="no-token"] { color: #f2c94c; }
+        .koppy-bridge-status[data-bridge-state="not-installed"] { color: #eb5757; }
+        .koppy-bridge-install { flex: 1 1 100%; color: var(--k-text-secondary); font-size: 12px; }
         .koppy-card-title {
             margin: 0;
             padding: 12px 16px 10px;
@@ -34781,7 +34787,7 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
         #pv-prefs_closeBtn { order: 2; }
         #pv-prefs .saveclose_buttons:focus-visible, #pv-prefs_resetLink:focus-visible { outline: 0; box-shadow: var(--k-focus); }
 
-        #pv-prefs_section_4 > :not(.config_var):not(.koppy-card):not(.koppy-panel-heading) { display: none !important; }
+        #pv-prefs_section_4 > :not(.config_var):not(.koppy-card):not(.koppy-bridge-card):not(.koppy-panel-heading) { display: none !important; }
 
         @media (max-width: 720px) {
             #pv-prefs_wrapper { grid-template-rows: auto minmax(0, 1fr) auto; }
@@ -35014,6 +35020,63 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
                 row.appendChild(input);
             }
             return row;
+        }
+
+        // Bridge section: status line, paste-token field and install hint. The token is
+        // sent once over the private MessagePort to the host, which stores it in GM
+        // storage; it is never part of the schema, never echoed back and never readable by the page.
+        function renderBridgeCard() {
+            const panel = document.getElementById("pv-prefs_section_4");
+            if (!panel) return;
+            // Not ".koppy-card": the generic card contract (count, search filtering) belongs to the schema cards.
+            const card = create("section", "koppy-bridge-card");
+            card.dataset.bridgeCard = "true";
+            card.appendChild(create("h3", "koppy-card-title", "Koppy Köprüsü"));
+            const row = create("div", "koppy-bridge-row");
+            row.dataset.fieldKey = "bridgeToken";
+            row.dataset.searchText = fold("Koppy Köprüsü köprü bridge token çoklu görsel pano");
+            const state = create("div", "koppy-bridge-status", "Köprü durumu denetleniyor…");
+            state.setAttribute("role", "status");
+            state.dataset.bridgeState = "checking";
+            const input = create("input", "");
+            input.type = "password";
+            input.id = "koppy-bridge-token";
+            input.autocomplete = "off";
+            input.spellcheck = false;
+            input.maxLength = 512;
+            input.placeholder = "Token'ı yapıştır (~/.koppy/bridge-token)";
+            input.setAttribute("aria-label", "Köprü token'ı");
+            const save = create("button", "", "Token'ı kaydet");
+            save.type = "button";
+            save.id = "koppy-bridge-token-save";
+            const install = create("div", "koppy-bridge-install");
+            install.id = "koppy-bridge-install";
+            install.appendChild(create("span", "", "Köprüyü kur: terminalde "));
+            install.appendChild(create("code", "", "scripts/install-bridge.sh"));
+            install.appendChild(create("span", "", " çalıştır, sonra "));
+            install.appendChild(create("code", "", "cat ~/.koppy/bridge-token"));
+            install.appendChild(create("span", "", " çıktısını buraya yapıştır."));
+            const labels = {
+                running: "Köprü çalışıyor",
+                "no-token": "Köprü çalışıyor, ama token yok",
+                "not-installed": "Köprü kurulu değil",
+            };
+            window.__koppyBridgeState = message => {
+                const key = labels[message.state] ? message.state : "not-installed";
+                state.textContent = message.error ? "Token kaydedilemedi: " + message.error : labels[key];
+                state.dataset.bridgeState = key;
+                install.style.display = key === "not-installed" ? "" : "none";
+            };
+            save.addEventListener("click", event => {
+                if (!event.isTrusted) return;
+                const value = input.value.trim();
+                input.value = "";
+                if (value) port.postMessage({ type: "bridge-token", token: sessionToken, value });
+            });
+            row.append(state, input, save, install);
+            card.appendChild(row);
+            panel.appendChild(card);
+            port.postMessage({ type: "bridge-status", token: sessionToken });
         }
 
         function collectValues() {
@@ -35338,6 +35401,7 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
                 card.appendChild(group);
             });
 
+            renderBridgeCard();
             baseline = collectValues();
             if (modifierMigrationNeeded) Object.assign(baseline, storedModifierValues);
             activate(activeIndex);
@@ -35446,6 +35510,8 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
                 if (!message || message.token !== sessionToken) return;
                 if (message.type === "request-close" && requestClose) {
                     requestClose();
+                } else if (message.type === "bridge-state" && typeof window.__koppyBridgeState === "function") {
+                    window.__koppyBridgeState(message);
                 } else if (message.type === "save-result" && !message.ok) {
                     document.getElementById("pv-prefs_saveBtn").disabled = false;
                     setStatus(message.error || "Ayarlar kaydedilemedi; değişikliklerin korunuyor", true);
@@ -35664,6 +35730,16 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
             }
             if (message.type === "close") {
                 closeSecure(config);
+                return;
+            }
+            if (message.type === "bridge-status" || message.type === "bridge-token") {
+                const bridge = options.bridge || hostWindow.KoppyBridgeInstance || (typeof globalThis !== "undefined" ? globalThis.KoppyBridgeInstance : null);
+                const reply = payload => { try { channel.port1.postMessage(Object.assign({ type: "bridge-state", token }, payload)); } catch (_) { /* closed */ } };
+                if (!bridge || typeof bridge.status !== "function") return reply({ state: "not-installed" });
+                const refresh = () => bridge.status().then(state => reply({ state }), () => reply({ state: "not-installed" }));
+                if (message.type === "bridge-token" && typeof message.value === "string") {
+                    Promise.resolve().then(() => bridge.setToken(message.value)).then(refresh, cause => reply({ state: "no-token", error: cause && cause.message || "geçersiz" }));
+                } else refresh();
                 return;
             }
             if (message.type !== "save") return;
@@ -36920,13 +36996,17 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
     "use strict";
 
-    // The companion extension uses Firefox Native Messaging, so this bridge
-    // never opens a loopback socket and receives a final result only after the
-    // native host has written the macOS pasteboard.
+    // Transport order: (a) companion/Native Messaging when it armed a trusted
+    // pointerdown, (b) authenticated HTTP to the installed Koppy Bridge on
+    // 127.0.0.1 (token in X-Koppy-Token, kept in GM storage), (c) a visible
+    // "bridge not installed" error. Image bytes and the token are never logged.
     const CHANNEL = "koppy-bridge-v1";
     const SCRIPT_VERSION = "0.7.0";
     const MAX_ITEMS = 10;
     const MAX_BYTES = 150 * 1024 * 1024;
+    const BRIDGE_URL = "http://127.0.0.1:47651";
+    const TOKEN_KEY = "koppy.bridgeToken";
+    const FRAME_TYPE = "application/vnd.koppy.images+binary";
     const instances = typeof WeakMap === "function" ? new WeakMap() : null;
 
     function error(message, code) {
@@ -36964,11 +37044,63 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
         return { blobs, totalBytes };
     }
 
+    function defaultHttp() {
+        return typeof GM_xmlhttpRequest === "function" ? GM_xmlhttpRequest : null;
+    }
+
+    // Frame = repeated [uint32 big-endian length][PNG bytes], as the Swift bridge expects.
+    async function buildFrame(blobs) {
+        const parts = [];
+        for (const blob of blobs) {
+            const bytes = new Uint8Array(await blob.arrayBuffer());
+            const head = new Uint8Array(4);
+            new DataView(head.buffer).setUint32(0, bytes.length, false);
+            parts.push(head, bytes);
+        }
+        return new Blob(parts, { type: FRAME_TYPE });
+    }
+
+    function postFrame(http, url, token, frame, timeout) {
+        return new Promise((resolve, reject) => {
+            let done = false;
+            const fail = (message, code) => { if (!done) { done = true; reject(error(message, code)); } };
+            try {
+                http({
+                    method: "POST", url: url + "/v1/images", data: frame, anonymous: true, timeout: timeout || 30000,
+                    headers: { "Content-Type": FRAME_TYPE, "X-Koppy-Token": token },
+                    onload(response) {
+                        if (done) return;
+                        const status = Number(response && response.status);
+                        if (status === 200) {
+                            let count = NaN;
+                            try { count = JSON.parse(response.responseText).count; } catch (_) { /* fall through */ }
+                            if (!Number.isInteger(count)) return fail("köprü beklenmeyen yanıt verdi", "bridge-bad-response");
+                            done = true; resolve({ count, status });
+                        } else if (status === 401) fail("token yanlış veya eski; Kontrol Merkezi'nden yeniden yapıştır", "bridge-token-rejected");
+                        else if (status === 429) fail("köprü istek sınırına ulaştı (dakikada 10); biraz bekle", "bridge-rate-limited");
+                        else if (status === 413) fail("köprü boyut sınırını aştı", "bridge-too-large");
+                        else fail("köprü isteği reddetti (HTTP " + status + ")", "bridge-http-" + status);
+                    },
+                    onerror() { fail("köprü kurulu değil veya çalışmıyor", "bridge-not-installed"); },
+                    ontimeout() { fail("köprü zaman aşımına uğradı", "bridge-http-timeout"); },
+                    onabort() { fail("köprü isteği iptal edildi", "bridge-http-aborted"); },
+                });
+            } catch (_) { fail("köprü isteği başlatılamadı", "bridge-http-unavailable"); }
+        });
+    }
+
     function create(options) {
         const settings = options || {};
         const win = settings.window || (typeof window === "undefined" ? null : window);
         const cryptoLike = settings.crypto || (typeof crypto === "undefined" ? null : crypto);
         let armed = null;
+        const http = settings.httpRequest !== undefined ? settings.httpRequest : defaultHttp();
+        const bridgeUrl = settings.bridgeUrl || BRIDGE_URL;
+        async function readToken() {
+            if (typeof settings.getToken === "function") return String(await settings.getToken() || "").trim();
+            if (typeof GM_getValue === "function") return String(await GM_getValue(TOKEN_KEY, "") || "").trim();
+            return "";
+        }
         const pending = new Map();
         let disposed = false;
 
@@ -37030,12 +37162,56 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
             });
         }
 
+        async function writeViaHttp(prepared, flowId, companionError) {
+            if (typeof http !== "function") throw error("köprü kurulu değil (companion yok, HTTP kullanılamıyor)", "bridge-not-installed");
+            const token = await readToken();
+            if (!token) {
+                diagnostic(settings, "bridge_http_failed", { flowId, errorCode: "bridge-token-missing", transport: "http" });
+                throw error("token yok; Kontrol Merkezi > Genel > Köprü bölümüne ~/.koppy/bridge-token içeriğini yapıştır", "bridge-token-missing");
+            }
+            diagnostic(settings, "bridge_http_start", { flowId, imageCount: prepared.blobs.length, totalBytes: prepared.totalBytes, transport: "http" });
+            try {
+                const result = await postFrame(http, bridgeUrl, token, await buildFrame(prepared.blobs), settings.timeout);
+                diagnostic(settings, "bridge_http_complete", { flowId, imageCount: result.count, totalBytes: prepared.totalBytes, status: result.status, transport: "http" });
+                return { count: result.count };
+            } catch (cause) {
+                diagnostic(settings, "bridge_http_failed", { flowId, errorCode: cause && cause.koppyCode || "bridge-failed", transport: "http" });
+                throw cause;
+            }
+        }
+
+        // "running" | "no-token" | "not-installed"; health is unauthenticated and read-only.
+        function status() {
+            return new Promise(resolve => {
+                if (typeof http !== "function") return resolve("not-installed");
+                let settled = false;
+                const finish = async ok => { if (settled) return; settled = true; resolve(!ok ? "not-installed" : ((await readToken()) ? "running" : "no-token")); };
+                try {
+                    http({ method: "GET", url: bridgeUrl + "/v1/health", anonymous: true, timeout: 2500,
+                        onload(r) { finish(Number(r && r.status) === 200); }, onerror() { finish(false); }, ontimeout() { finish(false); } });
+                } catch (_) { finish(false); }
+            });
+        }
+
+        async function setToken(value) {
+            const token = String(value || "").trim();
+            if (token.length > 512 || /\s/.test(token)) throw error("token biçimi geçersiz", "bridge-token-invalid");
+            if (typeof settings.setToken === "function") return settings.setToken(token);
+            if (typeof GM_setValue === "function") return GM_setValue(TOKEN_KEY, token);
+            throw error("GM depolaması kullanılamıyor", "bridge-storage-unavailable");
+        }
+
         async function writeImages(items) {
             if (disposed) throw error("Koppy Bridge artık etkin değil", "bridge-disposed");
             if (!win || typeof win.postMessage !== "function") throw error("Koppy Bridge Companion kullanılamıyor", "bridge-window-unavailable");
             const flowId = settings.diagnostics && typeof settings.diagnostics.flowId === "function" ? settings.diagnostics.flowId() : "bridge";
             const prepared = await validateItems(items);
-            const arm = await consumeArm();
+            let arm = null;
+            try { arm = await consumeArm(); }
+            catch (cause) {
+                if (!cause || cause.koppyCode !== "bridge-companion-unavailable") throw cause;
+                return writeViaHttp(prepared, flowId, cause);
+            }
             const id = randomId(cryptoLike);
             diagnostic(settings, "bridge_native_start", { flowId, imageCount: prepared.blobs.length, totalBytes: prepared.totalBytes, transport: "native-messaging" });
             return new Promise((resolve, reject) => {
@@ -37060,10 +37236,14 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
             });
         }
 
-        return { writeImages, validateItems, dispose, SCRIPT_VERSION };
+        const api = { writeImages, validateItems, dispose, status, setToken, SCRIPT_VERSION };
+        // Lets the settings panel (a separate module) reach the live instance without
+        // build wiring. Only status()/setToken() are used there; the token is never readable.
+        if (settings.publish !== false && typeof globalThis !== "undefined") globalThis.KoppyBridgeInstance = api;
+        return api;
     }
 
-    return { CHANNEL, MAX_BYTES, MAX_ITEMS, SCRIPT_VERSION, create, validateItems };
+    return { CHANNEL, MAX_BYTES, MAX_ITEMS, SCRIPT_VERSION, TOKEN_KEY, BRIDGE_URL, FRAME_TYPE, create, validateItems, buildFrame };
 });
 
 

@@ -290,13 +290,19 @@
         .koppy-settings-content.is-searching .section_header_holder.koppy-search-match + .section_header_holder.koppy-search-match { padding-top: 8px !important; }
         .koppy-settings-content.is-searching .section_header_holder .koppy-panel-heading { display: block; margin-bottom: 12px; }
 
-        .koppy-card {
+        .koppy-card, .koppy-bridge-card {
             margin: 0 0 14px;
             overflow: hidden;
             border: 1px solid var(--k-border);
             border-radius: 11px;
             background: var(--k-surface);
         }
+        .koppy-bridge-card .koppy-bridge-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 16px; }
+        .koppy-bridge-status { flex: 1 1 100%; font-weight: 600; }
+        .koppy-bridge-status[data-bridge-state="running"] { color: #6fcf97; }
+        .koppy-bridge-status[data-bridge-state="no-token"] { color: #f2c94c; }
+        .koppy-bridge-status[data-bridge-state="not-installed"] { color: #eb5757; }
+        .koppy-bridge-install { flex: 1 1 100%; color: var(--k-text-secondary); font-size: 12px; }
         .koppy-card-title {
             margin: 0;
             padding: 12px 16px 10px;
@@ -602,7 +608,7 @@
         #pv-prefs_closeBtn { order: 2; }
         #pv-prefs .saveclose_buttons:focus-visible, #pv-prefs_resetLink:focus-visible { outline: 0; box-shadow: var(--k-focus); }
 
-        #pv-prefs_section_4 > :not(.config_var):not(.koppy-card):not(.koppy-panel-heading) { display: none !important; }
+        #pv-prefs_section_4 > :not(.config_var):not(.koppy-card):not(.koppy-bridge-card):not(.koppy-panel-heading) { display: none !important; }
 
         @media (max-width: 720px) {
             #pv-prefs_wrapper { grid-template-rows: auto minmax(0, 1fr) auto; }
@@ -835,6 +841,63 @@
                 row.appendChild(input);
             }
             return row;
+        }
+
+        // Bridge section: status line, paste-token field and install hint. The token is
+        // sent once over the private MessagePort to the host, which stores it in GM
+        // storage; it is never part of the schema, never echoed back and never readable by the page.
+        function renderBridgeCard() {
+            const panel = document.getElementById("pv-prefs_section_4");
+            if (!panel) return;
+            // Not ".koppy-card": the generic card contract (count, search filtering) belongs to the schema cards.
+            const card = create("section", "koppy-bridge-card");
+            card.dataset.bridgeCard = "true";
+            card.appendChild(create("h3", "koppy-card-title", "Koppy Köprüsü"));
+            const row = create("div", "koppy-bridge-row");
+            row.dataset.fieldKey = "bridgeToken";
+            row.dataset.searchText = fold("Koppy Köprüsü köprü bridge token çoklu görsel pano");
+            const state = create("div", "koppy-bridge-status", "Köprü durumu denetleniyor…");
+            state.setAttribute("role", "status");
+            state.dataset.bridgeState = "checking";
+            const input = create("input", "");
+            input.type = "password";
+            input.id = "koppy-bridge-token";
+            input.autocomplete = "off";
+            input.spellcheck = false;
+            input.maxLength = 512;
+            input.placeholder = "Token'ı yapıştır (~/.koppy/bridge-token)";
+            input.setAttribute("aria-label", "Köprü token'ı");
+            const save = create("button", "", "Token'ı kaydet");
+            save.type = "button";
+            save.id = "koppy-bridge-token-save";
+            const install = create("div", "koppy-bridge-install");
+            install.id = "koppy-bridge-install";
+            install.appendChild(create("span", "", "Köprüyü kur: terminalde "));
+            install.appendChild(create("code", "", "scripts/install-bridge.sh"));
+            install.appendChild(create("span", "", " çalıştır, sonra "));
+            install.appendChild(create("code", "", "cat ~/.koppy/bridge-token"));
+            install.appendChild(create("span", "", " çıktısını buraya yapıştır."));
+            const labels = {
+                running: "Köprü çalışıyor",
+                "no-token": "Köprü çalışıyor, ama token yok",
+                "not-installed": "Köprü kurulu değil",
+            };
+            window.__koppyBridgeState = message => {
+                const key = labels[message.state] ? message.state : "not-installed";
+                state.textContent = message.error ? "Token kaydedilemedi: " + message.error : labels[key];
+                state.dataset.bridgeState = key;
+                install.style.display = key === "not-installed" ? "" : "none";
+            };
+            save.addEventListener("click", event => {
+                if (!event.isTrusted) return;
+                const value = input.value.trim();
+                input.value = "";
+                if (value) port.postMessage({ type: "bridge-token", token: sessionToken, value });
+            });
+            row.append(state, input, save, install);
+            card.appendChild(row);
+            panel.appendChild(card);
+            port.postMessage({ type: "bridge-status", token: sessionToken });
         }
 
         function collectValues() {
@@ -1159,6 +1222,7 @@
                 card.appendChild(group);
             });
 
+            renderBridgeCard();
             baseline = collectValues();
             if (modifierMigrationNeeded) Object.assign(baseline, storedModifierValues);
             activate(activeIndex);
@@ -1267,6 +1331,8 @@
                 if (!message || message.token !== sessionToken) return;
                 if (message.type === "request-close" && requestClose) {
                     requestClose();
+                } else if (message.type === "bridge-state" && typeof window.__koppyBridgeState === "function") {
+                    window.__koppyBridgeState(message);
                 } else if (message.type === "save-result" && !message.ok) {
                     document.getElementById("pv-prefs_saveBtn").disabled = false;
                     setStatus(message.error || "Ayarlar kaydedilemedi; değişikliklerin korunuyor", true);
@@ -1485,6 +1551,16 @@
             }
             if (message.type === "close") {
                 closeSecure(config);
+                return;
+            }
+            if (message.type === "bridge-status" || message.type === "bridge-token") {
+                const bridge = options.bridge || hostWindow.KoppyBridgeInstance || (typeof globalThis !== "undefined" ? globalThis.KoppyBridgeInstance : null);
+                const reply = payload => { try { channel.port1.postMessage(Object.assign({ type: "bridge-state", token }, payload)); } catch (_) { /* closed */ } };
+                if (!bridge || typeof bridge.status !== "function") return reply({ state: "not-installed" });
+                const refresh = () => bridge.status().then(state => reply({ state }), () => reply({ state: "not-installed" }));
+                if (message.type === "bridge-token" && typeof message.value === "string") {
+                    Promise.resolve().then(() => bridge.setToken(message.value)).then(refresh, cause => reply({ state: "no-token", error: cause && cause.message || "geçersiz" }));
+                } else refresh();
                 return;
             }
             if (message.type !== "save") return;
