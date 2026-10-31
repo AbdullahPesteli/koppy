@@ -1,0 +1,294 @@
+{
+  "google-udm2/e-natural-data-uri-card": {
+    "clip": {
+      "types": [
+        "image/png"
+      ],
+      "mime": "image/png",
+      "bytes": 784568,
+      "dim": "1004x1002"
+    },
+    "requests": [
+      {
+        "url": "https://petgross.com.tr/images/095577b2-7631-4970-aac8-f67dc0fdb305/f61354c9-7da9-4646-ace5-5802b079dcc7/image_1080.jpg",
+        "status": 200,
+        "ctype": "image/webp",
+        "bytes": 41892
+      }
+    ],
+    "toast": "Kopyalandı: 1004×1002",
+    "feedback": "Kopyalandı · 1004×1002"
+  },
+  "google-udm2/d-natural-preview-only-card": {
+    "clip": {
+      "types": [
+        "image/png"
+      ],
+      "mime": "image/png",
+      "bytes": 1150543,
+      "dim": "1200x800"
+    },
+    "requests": [
+      {
+        "url": "https://cdn.oggusto.com/uploads/2025/07/kedilerde-agiz-acik-nefes-alma-uyarisi.webp",
+        "status": 200,
+        "ctype": "image/webp",
+        "bytes": 123240
+      }
+    ],
+    "toast": "Kopyalandı: 1200×800",
+    "feedback": "Kopyalandı · 1200×800"
+  },
+  "google-udm2/a-injected": {
+    "clip": {
+      "types": [
+        "image/png"
+      ],
+      "mime": "image/png",
+      "bytes": 61241,
+      "dim": "240x135"
+    },
+    "requests": [
+      {
+        "url": "https://ichef.bbci.co.uk/news/240/cpsprodpb/ea75/live/f93e2820-d4b7-11f1-a701-fddedf244c16.jpg.webp",
+        "status": 200,
+        "ctype": "image/webp",
+        "bytes": 6962
+      }
+    ],
+    "toast": "Kopyalandı: 240×135",
+    "feedback": "Kopyalandı · 240×135"
+  },
+  "google-udm2/b-injected": {
+    "clip": {
+      "types": [
+        "image/png"
+      ],
+      "mime": "image/png",
+      "bytes": 61241,
+      "dim": "240x135"
+    },
+    "requests": [
+      {
+        "url": "https://ichef.bbci.co.uk/news/240/cpsprodpb/ea75/live/f93e2820-d4b7-11f1-a701-fddedf244c16.jpg.webp",
+        "status": 200,
+        "ctype": "image/webp",
+        "bytes": 6962
+      }
+    ],
+    "toast": "Kopyalandı: 240×135",
+    "feedback": "Kopyalandı · 240×135"
+  },
+  "google-udm2/c-injected": {
+    "clip": {
+      "types": [
+        "text/plain"
+      ],
+      "bytes": 0,
+      "note": "Koppy tetiklenmedi; pano hâlâ SENTINEL=SENTINEL"
+    },
+    "requests": [],
+    "toast": "",
+    "feedback": ""
+  },
+  "google-udm2/e-injected": {
+    "clip": {
+      "types": [
+        "text/plain"
+      ],
+      "bytes": 0,
+      "note": "Koppy tetiklenmedi; pano hâlâ SENTINEL=SENTINEL"
+    },
+    "requests": [],
+    "toast": "",
+    "feedback": ""
+  },
+  "google-tbm-isch/e-natural-data-uri-card": {
+    "clip": {
+      "types": [
+        "image/png"
+      ],
+      "mime": "image/png",
+      "bytes": 1150543,
+      "dim": "1200x800"
+    },
+    "requests": [
+      {
+        "url": "https://cdn.oggusto.com/uploads/2025/07/kedilerde-agiz-acik-nefes-alma-uyarisi.webp",
+        "status": 200,
+        "ctype": "image/webp",
+        "bytes": 123240
+      }
+    ],
+    "toast": "Kopyalandı: 1200×800",
+    "feedback": "Kopyalandı · 1200×800"
+  },
+  "google-tbm-isch/d-natural-preview-only-card": {
+    "na": true,
+    "note": "snapshot'ta tbn: URL'li kart yok (hepsi data: placeholder); docid'li img=200",
+    "clip": {
+      "types": [],
+      "bytes": 0
+    },
+    "requests": [],
+    "toast": ""
+  },
+  "google-tbm-isch/a-injected": {
+    "clip": {
+      "types": [
+        "image/png"
+      ],
+      "mime": "image/png",
+      "bytes": 61241,
+      "dim": "240x135"
+    },
+    "requests": [
+      {
+        "url": "https://ichef.bbci.co.uk/news/240/cpsprodpb/ea75/live/f93e2820-d4b7-11f1-a701-fddedf244c16.jpg.webp",
+        "status": 200,
+        "ctype": "image/webp",
+        "bytes": 6962
+      }
+    ],
+    "toast": "Kopyalandı: 240×135",
+    "feedback": "Kopyalandı · 240×135"
+  },
+  "google-tbm-isch/b-injected": {
+    "clip": {
+      "types": [
+        "image/png"
+      ],
+      "mime": "image/png",
+      "bytes": 61241,
+      "dim": "240x135"
+    },
+    "requests": [
+      {
+        "url": "https://ichef.bbci.co.uk/news/240/cpsprodpb/ea75/live/f93e2820-d4b7-11f1-a701-fddedf244c16.jpg.webp",
+        "status": 200,
+        "ctype": "image/webp",
+        "bytes": 6962
+      }
+    ],
+    "toast": "Kopyalandı: 240×135",
+    "feedback": "Kopyalandı · 240×135"
+  },
+  "google-tbm-isch/c-injected": {
+    "clip": {
+      "types": [
+        "text/plain"
+      ],
+      "bytes": 0,
+      "note": "Koppy tetiklenmedi; pano hâlâ SENTINEL=SENTINEL"
+    },
+    "requests": [],
+    "toast": "",
+    "feedback": ""
+  },
+  "google-tbm-isch/e-injected": {
+    "clip": {
+      "types": [
+        "text/plain"
+      ],
+      "bytes": 0,
+      "note": "Koppy tetiklenmedi; pano hâlâ SENTINEL=SENTINEL"
+    },
+    "requests": [],
+    "toast": "",
+    "feedback": ""
+  },
+  "bbc-news/ab-natural-img-srcset": {
+    "srcset": true,
+    "clip": {
+      "types": [
+        "image/png"
+      ],
+      "mime": "image/png",
+      "bytes": 1869224,
+      "dim": "1536x864"
+    },
+    "requests": [
+      {
+        "url": "https://ichef.bbci.co.uk/news/1536/cpsprodpb/ea75/live/f93e2820-d4b7-11f1-a701-fddedf244c16.jpg.webp",
+        "status": 200,
+        "ctype": "image/webp",
+        "bytes": 159996
+      }
+    ],
+    "toast": "Kopyalandı: 1536×864",
+    "feedback": "Kopyalandı · 1536×864"
+  },
+  "bbc-news/a-injected": {
+    "clip": {
+      "types": [
+        "image/png"
+      ],
+      "mime": "image/png",
+      "bytes": 61241,
+      "dim": "240x135"
+    },
+    "requests": [
+      {
+        "url": "https://ichef.bbci.co.uk/news/240/cpsprodpb/ea75/live/f93e2820-d4b7-11f1-a701-fddedf244c16.jpg.webp",
+        "status": 200,
+        "ctype": "image/webp",
+        "bytes": 6962
+      }
+    ],
+    "toast": "Kopyalandı: 240×135",
+    "feedback": "Kopyalandı · 240×135"
+  },
+  "bbc-news/b-injected": {
+    "clip": {
+      "types": [
+        "image/png"
+      ],
+      "mime": "image/png",
+      "bytes": 61241,
+      "dim": "240x135"
+    },
+    "requests": [
+      {
+        "url": "https://ichef.bbci.co.uk/news/240/cpsprodpb/ea75/live/f93e2820-d4b7-11f1-a701-fddedf244c16.jpg.webp",
+        "status": 200,
+        "ctype": "image/webp",
+        "bytes": 6962
+      }
+    ],
+    "toast": "Kopyalandı: 240×135",
+    "feedback": "Kopyalandı · 240×135"
+  },
+  "bbc-news/c-injected": {
+    "clip": {
+      "types": [
+        "image/png"
+      ],
+      "mime": "image/png",
+      "bytes": 1869224,
+      "dim": "1536x864"
+    },
+    "requests": [
+      {
+        "url": "https://ichef.bbci.co.uk/news/1536/cpsprodpb/ea75/live/f93e2820-d4b7-11f1-a701-fddedf244c16.jpg.webp",
+        "status": 200,
+        "ctype": "image/webp",
+        "bytes": 159996
+      }
+    ],
+    "toast": "Kopyalandı: 1536×864",
+    "feedback": "Kopyalandı · 1536×864"
+  },
+  "bbc-news/e-injected": {
+    "clip": {
+      "types": [
+        "image/png"
+      ],
+      "mime": "image/png",
+      "bytes": 88,
+      "dim": "1x1"
+    },
+    "requests": [],
+    "toast": "Önizleme kopyalandı: 1×1",
+    "feedback": "Önizleme kopyalandı · 1×1"
+  }
+}
