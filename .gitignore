@@ -18,3 +18,7 @@ docs/private/
 !.env.example
 *.pem
 *.key
+
+# Local research archive (39 MB browser archive; the notes live in docs/re/)
+picviewer-re/
+.worktrees/

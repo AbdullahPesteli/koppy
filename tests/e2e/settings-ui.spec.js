@@ -361,8 +361,8 @@ test("real dist settings are readable, searchable, persistent and responsive", a
     await frame.locator("#pv-prefs_resetLink").click();
     await expect(frame.locator("#pv-prefs_field_customLang")).toHaveValue(alternateLanguage);
     // "Sıfırla" is a two-step confirmation: the first activation only arms it.
-    await frame.locator("#pv-prefs_resetLink").click();
-    await frame.locator("#pv-prefs_resetLink").click();
+    await activateFooterButton(page, frame, "#pv-prefs_resetLink");
+    await activateFooterButton(page, frame, "#pv-prefs_resetLink");
     await expect(frame.locator("#pv-prefs_field_customLang")).toHaveValue("auto");
     await activateFooterButton(page, frame, "#pv-prefs_saveBtn");
     await expectSettingsClosed(page);
