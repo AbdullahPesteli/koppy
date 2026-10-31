@@ -320,7 +320,7 @@ test("built Koppy copies a normal Google result embedded as data:image without G
     await page.route("https://www.google.com/search?**", route => route.fulfill({
         status: 200,
         contentType: "text/html",
-        body: `<!doctype html><html><head></head><body><canvas id="seed" width="2" height="2"></canvas><img id="normal-result" width="92" height="92" alt="vaseline jel"><script>const c=document.getElementById('seed'); const x=c.getContext('2d'); x.fillStyle='#7c9cff'; x.fillRect(0,0,2,2); document.getElementById('normal-result').src=c.toDataURL('image/png'); c.remove();</script></body></html>`,
+        body: `<!doctype html><html><head></head><body><canvas id="seed" width="48" height="48"></canvas><img id="normal-result" width="92" height="92" alt="vaseline jel"><script>const c=document.getElementById('seed'); const x=c.getContext('2d'); x.fillStyle='#7c9cff'; x.fillRect(0,0,48,48); document.getElementById('normal-result').src=c.toDataURL('image/png'); c.remove();</script></body></html>`,
     }));
     await page.goto("https://www.google.com/search?q=vaseline+jel");
     await page.evaluate(() => {
@@ -344,7 +344,7 @@ test("built Koppy copies a normal Google result embedded as data:image without G
     }, built)).toBeNull();
     await page.hover("#normal-result");
     await page.keyboard.press("Meta+C");
-    await expect(page.locator("#koppy-copy-toast")).toContainText("Önizleme kopyalandı: 2×2");
+    await expect(page.locator("#koppy-copy-toast")).toContainText("Önizleme kopyalandı: 48×48");
     const clipboard = await page.evaluate(async () => {
         const items = await navigator.clipboard.read();
         const blob = await items[0].getType("image/png");
@@ -353,7 +353,7 @@ test("built Koppy copies a normal Google result embedded as data:image without G
         bitmap.close();
         return result;
     });
-    expect(clipboard).toEqual({ count: 1, types: ["image/png"], width: 2, height: 2 });
+    expect(clipboard).toEqual({ count: 1, types: ["image/png"], width: 48, height: 48 });
 });
 
 test("built Koppy userscript copies a visible QuickHover image on Wikipedia", async ({ page }) => {
