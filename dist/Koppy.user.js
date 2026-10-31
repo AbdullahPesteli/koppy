@@ -12,13 +12,13 @@
 // @description:ja       画像を強力に閲覧できるツール。ポップアップ表示、拡大・縮小、回転、一括保存などの機能を自動で実行できます
 // @description:pt-BR    Poderosa ferramenta de visualização de imagens on-line, que pode pop-up/dimensionar/girar/salvar em lote imagens automaticamente
 // @description:ru       Мощный онлайн-инструмент для просмотра изображений, который может автоматически отображать/масштабировать/вращать/пакетно сохранять изображения
-// @version              0.6.0
+// @version              0.7.0
 // @icon                 data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAMAAADXqc3KAAAAV1BMVEUAAAD////29vbKysoqKioiIiKysrKhoaGTk5N9fX3z8/Pv7+/r6+vk5OTb29vOzs6Ojo5UVFQzMzMZGRkREREMDAy4uLisrKylpaV4eHhkZGRPT08/Pz/IfxjQAAAAgklEQVQoz53RRw7DIBBAUb5pxr2m3/+ckfDImwyJlL9DDzQgDIUMRu1vWOxTBdeM+onApENF0qHjpkOk2VTwLVEF40Kbfj1wK8AVu2pQA1aBBYDHJ1wy9Cf4cXD5chzNAvsAnc8TjoLAhIzsBao9w1rlVTIvkOYMd9nm6xPi168t9AYkbANdajpjcwAAAABJRU5ErkJggg==
 // @namespace            https://github.com/AbdullahPesteli/koppy
 // @homepage             https://github.com/AbdullahPesteli/koppy
 // @supportURL           https://github.com/AbdullahPesteli/koppy/issues
-// @updateURL            https://raw.githubusercontent.com/AbdullahPesteli/koppy/master/dist/Koppy.user.js
-// @downloadURL          https://raw.githubusercontent.com/AbdullahPesteli/koppy/master/dist/Koppy.user.js
+// @updateURL            https://raw.githubusercontent.com/AbdullahPesteli/koppy/release/dist/Koppy.user.js
+// @downloadURL          https://raw.githubusercontent.com/AbdullahPesteli/koppy/release/dist/Koppy.user.js
 // @connect              www.google.com
 // @connect              www.google.com.hk
 // @connect              www.google.co.jp
@@ -36924,7 +36924,7 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
     // never opens a loopback socket and receives a final result only after the
     // native host has written the macOS pasteboard.
     const CHANNEL = "koppy-bridge-v1";
-    const SCRIPT_VERSION = "0.6.0";
+    const SCRIPT_VERSION = "0.7.0";
     const MAX_ITEMS = 10;
     const MAX_BYTES = 150 * 1024 * 1024;
     const instances = typeof WeakMap === "function" ? new WeakMap() : null;
@@ -37305,14 +37305,17 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
             seen.add(normalized);
             sources.push({ url: normalized, source, isThumbnailFallback: !shouldExcludeThumbnail && isThumbnail });
         };
-        parseSrcset(element && element.getAttribute && element.getAttribute("srcset"), baseUrl)
-            .forEach(candidate => add(candidate.url, "srcset"));
+        // Deterministic order: the largest declared candidate across the <img>
+        // srcset AND every <picture><source> wins, not whichever list is read first.
+        const scored = parseSrcset(element && element.getAttribute && element.getAttribute("srcset"), baseUrl)
+            .map(candidate => ({ url: candidate.url, score: candidate.score, source: "srcset" }));
         const picture = element && element.closest && element.closest("picture");
         if (picture && picture.querySelectorAll) {
             picture.querySelectorAll("source[srcset]").forEach(node => {
-                parseSrcset(node.getAttribute("srcset"), baseUrl).forEach(candidate => add(candidate.url, "picture-srcset"));
+                parseSrcset(node.getAttribute("srcset"), baseUrl).forEach(candidate => scored.push({ url: candidate.url, score: candidate.score, source: "picture-srcset" }));
             });
         }
+        scored.sort((a, b) => b.score - a.score).forEach(candidate => add(candidate.url, candidate.source));
         if (includeDirectSource !== false) {
             add(element && element.currentSrc, "currentSrc");
             add(element && (element.src || (element.getAttribute && element.getAttribute("src"))), "src");
@@ -37546,7 +37549,7 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
         documentUrlsFromElement(element, baseUrl).forEach(candidate => add(candidate.url, candidate.source, candidate));
         // This is intentionally last: a resolver, lazy-load field or normal
         // HTTPS src is always more useful than Google's embedded result preview.
-        if (!candidates.length && settings.allowEmbeddedPreview !== false && isNormalGoogleSearchLocation(baseUrl) && String(element.nodeName).toUpperCase() === "IMG") {
+        if (!candidates.length && settings.allowEmbeddedPreview !== false && String(element.nodeName).toUpperCase() === "IMG") {
             const embedded = embeddedImageCandidate(element.currentSrc || element.src || (element.getAttribute && element.getAttribute("src")), element, "embedded-preview");
             if (embedded) candidates.push(embedded);
         }
@@ -38941,11 +38944,13 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
             }
             setHoveredImage(current.element, true);
             if (!current || !current.candidates.length) {
-                if (!current || !current.isGoogleResult) return { status: "not-applicable" };
+                // On Google pages a non-result image keeps native behaviour; on every
+                // other page a hovered image we cannot resolve must fail visibly.
+                if (!current || (isGoogleImagesLocation(locationLike) && !current.isGoogleResult)) return { status: "not-applicable" };
                 event.preventDefault();
                 if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
                 else if (typeof event.stopPropagation === "function") event.stopPropagation();
-                notify("Koppy: Orijinal görsel adresi bulunamadı", "error");
+                notify("Koppy: kopyalanamadı: kaynak çözülemedi", "error");
                 diagnostic("copy_failed", { flowId: copyFlowId, errorKind: "candidate", errorCode: "candidate-not-found" });
                 return { status: "failed", reason: "candidate-not-found" };
             }
@@ -39164,7 +39169,7 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
         }).start();
         globalThis.KoppyPreviewFit.install({ ImgWindowC: ImgWindowC, prefs: prefs, window: window });
 
-        const koppyOpenUpdate = () => _GM_openInTab("https://raw.githubusercontent.com/AbdullahPesteli/koppy/master/dist/Koppy.user.js", {active:true});
+        const koppyOpenUpdate = () => _GM_openInTab("https://raw.githubusercontent.com/AbdullahPesteli/koppy/release/dist/Koppy.user.js", {active:true});
         const koppyCopyDiagnostics = () => {
             const text = globalThis.KoppyDiagnostics && globalThis.KoppyDiagnostics.summaryText
                 ? globalThis.KoppyDiagnostics.summaryText() : "Koppy tanı verisi henüz oluşmadı";
