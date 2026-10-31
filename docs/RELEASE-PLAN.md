@@ -60,11 +60,11 @@ Fail-closed: every check prints PASS/FAIL, rc=1 on any FAIL, missing artefact/ta
 | Post-patch `npm test` | rc=0, 57 pass, 0 fail |
 | Determinism: two builds via `KOPPY_BUILD_OUT` | identical sha256 `bce265ea43d8…`; `@version 0.7.0`, `SCRIPT_VERSION "0.7.0"`, URLs `release` |
 | Post-patch `release-check.mjs` (clean tree, default branch) | **RED rc=1**: 7 PASS / 6 FAIL |
-| Post-patch `release-check.mjs --branch release` | **RED rc=1**: 5 FAIL (see below) |
+| Post-patch `release-check.mjs --branch release` | **RED rc=1**: 7 PASS / 6 FAIL (stale dist x4 incl. master URLs, no tag, rebuild sha) |
 
 Separation of RED causes (post-patch, expected):
 - **Single-source / rebuild mechanics: PASS** (versions aligned in package/lock/STATUS, source placeholder, deterministic rebuild).
 - **Stale tracked dist** (`dist/Koppy.user.js` still 0.6.0, sha `25c8bc32…`; rebuild sha `bce265ea…`): FAIL by design — K02 may not commit dist.
-- **Real release gates** (tag `v0.7.0` absent, branch is `koppy/k02-release-chain` and URLs say master/release): FAIL by design until steps 2–5 run.
+- **Real release gates** (tag `v0.7.0` absent; with default branch the target is `koppy/k02-release-chain` ≠ URL branch): FAIL by design until steps 2–5 run.
 
 No check was relaxed and no tag/branch/remote was created to pass.
