@@ -1,11 +1,17 @@
 # Koppy
 
+**Tek `Cmd+V` ile N görsel:** Koppy ile kopyaladığın birkaç görseli ChatGPT gibi bir alana tek yapıştırmada
+ayrı öğeler olarak bırakırsın (bir kez yerel köprü kurulumu gerekir — [docs/INSTALL.md](docs/INSTALL.md)).
+
 Koppy, MIT lisanslı Picviewer CE+ kullanıcı betiğinin kişisel fork'udur. Mevcut Picviewer
 özelliklerini korur; QuickHover'ın bulduğu veya ekranda görünen görseli `Cmd+C` ile URL yerine gerçek
 PNG olarak panoya kopyalar. PDF ve PDF-uyumlu kaydedilmiş Illustrator (`.ai`) dosyaları için ilk sayfa
 yerelde PNG'ye render edilir. Ayar paneli Koppy'ye özel, aranabilir ve responsive'tir.
 
 ## Kurulum
+
+Adım adım rehber (komut + beklenen çıktı): **[docs/INSTALL.md](docs/INSTALL.md)** — Kademe A: temel kurulum,
+Kademe B: çoklu yapıştırma (köprü, token, "Bağlantıyı test et"). Kısa özet:
 
 1. Zen'de [Koppy.user.js](https://raw.githubusercontent.com/AbdullahPesteli/koppy/master/dist/Koppy.user.js)
    bağlantısını aç ve Tampermonkey'nin **Install / Kur** düğmesine bas.
@@ -48,7 +54,7 @@ geçici belleğini temizler, sistem panosuna dokunmaz.
 Bu özellik için bir defa yerel **Koppy Bridge** kurulur. Bridge yalnız `127.0.0.1` üzerinde dinler; rastgele
 eşleme anahtarı Tampermonkey'nin izole alanında saklanır, web sayfalarına CORS izni veya pano okuma yetkisi
 verilmez. Bu Mac'te Bridge kurulu ve çalışır haldedir. Başka bir Mac'te kaynak klasöründe `npm run bridge:install`
-komutu yeterlidir. Bridge sadece çoklu seçim rozeti tıklandığında panoya **yazar**; site trafiğini, cookie'leri,
+komutu yeterlidir; token'ı Kontrol Merkezi → Koppy Köprüsü bölümüne yapıştırıp **Bağlantıyı test et** ile doğrula (bkz. [docs/INSTALL.md](docs/INSTALL.md)). Bridge sadece çoklu seçim rozeti tıklandığında panoya **yazar**; site trafiğini, cookie'leri,
 URL'leri veya mevcut panodaki içeriği okumaz. Her aktarım en fazla 10 PNG / 150 MB ile sınırlıdır.
 
 Hover yalnız URL adayını çözer; ağ/decode işlemi `Cmd+C` öncesinde başlamaz. Google'da Koppy, Picviewer'ın
