@@ -35,10 +35,10 @@ URL kısaltmaları: `BBC240` = `https://ichef.bbci.co.uk/news/240/cpsprodpb/ea75
 | **a** | google-tbm-isch | PASS | image/png · 61 241 · 240×135 | BBC240 (6 962 B) | Kopyalandı: 240×135 |
 | **b** `<picture>/srcset` (enjekte, 240w+1024w) | google-udm2 | PASS (bkz. G3) | image/png · 61 241 · 240×135 | BBC240 | Kopyalandı: 240×135 |
 | **b** | google-tbm-isch | PASS (bkz. G3) | image/png · 61 241 · 240×135 | BBC240 | Kopyalandı: 240×135 |
-| **c** CSS background (enjekte `<div>` 80×50, BBC1536) | google-udm2 | **FAIL** | text/plain pano değişmedi (SENTINEL), görsel yok · 0 B | istek yok (0 GM_xmlhttpRequest) | toast yok |
-| **c** | google-tbm-isch | **FAIL** | aynı · 0 B | istek yok | toast yok |
-| **e** `data:` URI (enjekte tek başına `<img>`, 1×1 PNG) | google-udm2 | **FAIL** | pano değişmedi · 0 B | istek yok | toast yok |
-| **e** | google-tbm-isch | **FAIL** | pano değişmedi · 0 B | istek yok | toast yok |
+| **c** CSS background (enjekte `<div>` 80×50, BBC1536) | google-udm2 | ~~FAIL~~ → **PASS (K12)** | image/png · 1 869 224 · 1536×864 (önce: pano değişmedi, 0 B) | BBC1536 | Kopyalandı: 1536×864 |
+| **c** | google-tbm-isch | ~~FAIL~~ → **PASS (K12)** | aynı (1536×864) | BBC1536 | Kopyalandı: 1536×864 |
+| **e** `data:` URI (enjekte tek başına `<img>`, 1×1 PNG) | google-udm2 | ~~FAIL~~ → **PASS (K12, görünür hata)** | pano görsel değil, istek 0 (1×1 kopyalanmaz) | istek yok (kasıtlı) | toast: «Koppy: bu öğe görsel değil» |
+| **e** | google-tbm-isch | ~~FAIL~~ → **PASS (K12, görünür hata)** | pano görsel değil, istek 0 (1×1 kopyalanmaz) | istek yok (kasıtlı) | toast: «Koppy: bu öğe görsel değil» |
 | **a+b** gerçek BBC `<img srcSet=…>` (doğal) | bbc-news | PASS | image/png · 1 869 224 · 1536×864 | BBC1536 (159 996 B) — srcset'in en büyüğü | Kopyalandı: 1536×864 |
 | **a** küçük img (enjekte) | bbc-news | PASS | image/png · 61 241 · 240×135 | BBC240 (6 962 B) | Kopyalandı: 240×135 |
 | **b** `<picture>` (enjekte) | bbc-news | PASS (bkz. G3) | image/png · 61 241 · 240×135 | BBC240 | Kopyalandı: 240×135 |
@@ -77,3 +77,16 @@ Doğal BBC `<img srcSet=240w…1536w>` → **en büyük (1536)** seçildi; fakat
 - Şart 1: G1 (Google sayfasında kart-dışı CSS-bg / data: görsel) bilinen sınır olarak belgelenmeli veya düzeltme kartı açılmalı.
 - Şart 2: G3 (picture/srcset en büyük seçmiyor) incelenmeli; yayın engeli değil.
 - Şart 3: eksik senaryolar (§4) kapatılana dek "tüm 5 tür her Google layout'ta kanıtlı" iddiası yapılmamalı.
+
+
+## K12 — 4 FAIL kapatma (dal koppy/k12-google-nonresult)
+
+Önce (ölçüm, yukarıdaki tablo): c×2 ve e×2 sessiz düşüş (0 istek, 0 toast). Sonra: `real-layout.spec.js` 17/17, `npm test` 67/67.
+
+| Satır | Karar | Davranış |
+|---|---|---|
+| c · google-udm2 / tbm-isch (CSS background, 80×50) | (a) kopyalanır | Google'da IMG olmayan yüzey ≥ 32 px ise quick-hover/background çözücüsü kullanılır; BBC1536 kopyalanır. |
+| e · google-udm2 / tbm-isch (tek `data:` 1×1 PNG) | (b) görünür hata | Toast «Koppy: bu öğe görsel değil»; istek yok, pano değişmez (tracking pixel kopyalanmaz). |
+
+Eşikler: `MIN_NON_RESULT_IMAGE_PX = 32` (CSS px). Google'da IMG olmayan yüzey render boyutu < 32 px ise aday üretilmez; `data:` URI embedded önizleme için mevcut render ≥ 40 px şartına ek olarak doğal (naturalWidth/Height) < 32 px ise reddedilir. Eşik gevşetilmedi; testlere kesin beklentiler (toast/pano/istek) eklendi, artık ölçüm-kaydı değil iddia.
+Not: (c) güvenilir şekilde gerçek Google markup'ında yok (enjekte); gerçek sonuç kartı yolu değişmedi (d/e doğal PASS).

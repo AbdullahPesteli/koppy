@@ -82,25 +82,32 @@
   "google-udm2/c-injected": {
     "clip": {
       "types": [
-        "text/plain"
+        "image/png"
       ],
-      "bytes": 0,
-      "note": "Koppy tetiklenmedi; pano hâlâ SENTINEL=SENTINEL"
+      "mime": "image/png",
+      "bytes": 1869224,
+      "dim": "1536x864"
     },
-    "requests": [],
-    "toast": "",
-    "feedback": ""
+    "requests": [
+      {
+        "url": "https://ichef.bbci.co.uk/news/1536/cpsprodpb/ea75/live/f93e2820-d4b7-11f1-a701-fddedf244c16.jpg.webp",
+        "status": 200,
+        "ctype": "image/webp",
+        "bytes": 159996
+      }
+    ],
+    "toast": "Kopyalandı: 1536×864",
+    "feedback": "Kopyalandı · 1536×864"
   },
   "google-udm2/e-injected": {
     "clip": {
       "types": [
         "text/plain"
       ],
-      "bytes": 0,
-      "note": "Koppy tetiklenmedi; pano hâlâ SENTINEL=SENTINEL"
+      "bytes": 0
     },
     "requests": [],
-    "toast": "",
+    "toast": "Koppy: bu öğe görsel değil",
     "feedback": ""
   },
   "google-tbm-isch/e-natural-data-uri-card": {
@@ -176,25 +183,32 @@
   "google-tbm-isch/c-injected": {
     "clip": {
       "types": [
-        "text/plain"
+        "image/png"
       ],
-      "bytes": 0,
-      "note": "Koppy tetiklenmedi; pano hâlâ SENTINEL=SENTINEL"
+      "mime": "image/png",
+      "bytes": 1869224,
+      "dim": "1536x864"
     },
-    "requests": [],
-    "toast": "",
-    "feedback": ""
+    "requests": [
+      {
+        "url": "https://ichef.bbci.co.uk/news/1536/cpsprodpb/ea75/live/f93e2820-d4b7-11f1-a701-fddedf244c16.jpg.webp",
+        "status": 200,
+        "ctype": "image/webp",
+        "bytes": 159996
+      }
+    ],
+    "toast": "Kopyalandı: 1536×864",
+    "feedback": "Kopyalandı · 1536×864"
   },
   "google-tbm-isch/e-injected": {
     "clip": {
       "types": [
         "text/plain"
       ],
-      "bytes": 0,
-      "note": "Koppy tetiklenmedi; pano hâlâ SENTINEL=SENTINEL"
+      "bytes": 0
     },
     "requests": [],
-    "toast": "",
+    "toast": "Koppy: bu öğe görsel değil",
     "feedback": ""
   },
   "bbc-news/ab-natural-img-srcset": {
@@ -281,14 +295,12 @@
   "bbc-news/e-injected": {
     "clip": {
       "types": [
-        "image/png"
+        "text/plain"
       ],
-      "mime": "image/png",
-      "bytes": 88,
-      "dim": "1x1"
+      "bytes": 0
     },
     "requests": [],
-    "toast": "Önizleme kopyalandı: 1×1",
-    "feedback": "Önizleme kopyalandı · 1×1"
+    "toast": "Koppy: kopyalanamadı: kaynak çözülemedi",
+    "feedback": ""
   }
 }
