@@ -153,7 +153,19 @@ for (const snap of SNAPSHOTS) {
         test(`${snap.id} · ${k} enjekte`, async ({ page }) => {
             await boot(page, snap);
             await page.evaluate(h => document.body.insertAdjacentHTML("beforeend", h), INJECT[k]);
-            record(k + "-injected", await copyOn(page, "#k08-inj"));
+            const r = await copyOn(page, "#k08-inj");
+            record(k + "-injected", r);
+            // K12: sessiz düşüş yasak. c: kopyalanır (BBC1536); e: 1x1 data: -> görünür "görsel değil" hatası, pano görsel olmaz.
+            if (k === "c") {
+                expect(r.clip.types).toContain("image/png");
+                expect(r.requests.length).toBeGreaterThan(0);
+                expect(r.toast).toMatch(/Kopyaland/);
+            }
+            if (k === "e") {
+                expect(r.toast).toContain(snap.google ? "bu öğe görsel değil" : "kopyalanamadı"); // BBC: mevcut görünür hata
+                expect(r.requests.length).toBe(0);
+                expect(r.clip.types).not.toContain("image/png");
+            }
         });
     }
 }

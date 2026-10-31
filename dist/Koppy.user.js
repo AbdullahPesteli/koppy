@@ -37389,6 +37389,23 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
         return parsed.href;
     }
 
+    // K12: minimum intrinsic/rendered size (CSS px) for a Google non-result item to be
+    // copied. Smaller = tracking pixel / icon / logo chip -> visible "not an image" error.
+    const MIN_NON_RESULT_IMAGE_PX = 32;
+
+    function isTinyIntrinsicImage(element) {
+        if (!element || String(element.nodeName).toUpperCase() !== "IMG" || !element.complete) return false;
+        const nw = Number(element.naturalWidth || 0), nh = Number(element.naturalHeight || 0);
+        if (!nw || !nh) return false;
+        return nw < MIN_NON_RESULT_IMAGE_PX || nh < MIN_NON_RESULT_IMAGE_PX;
+    }
+
+    function isTinyNonResultItem(element) {
+        if (!element || String(element.nodeName).toUpperCase() !== "IMG") return false;
+        const src = String(element.currentSrc || element.src || "");
+        return /^data:/i.test(src) && isTinyIntrinsicImage(element);
+    }
+
     function embeddedImageCandidate(rawUrl, element, source) {
         // Google normal web search sometimes puts its result thumbnails straight
         // in the DOM as a data:image/... URL. They have no fetchable HTTPS URL,
@@ -37405,6 +37422,7 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
         const width = Number(element && (element.clientWidth || element.width) || (rect && rect.width) || 0);
         const height = Number(element && (element.clientHeight || element.height) || (rect && rect.height) || 0);
         if (width < 40 || height < 40) return null;
+        if (isTinyIntrinsicImage(element)) return null;
         return { url: value, element, source: source || "embedded-preview", isThumbnailFallback: true, isEmbeddedPreview: true };
     }
 
@@ -38963,6 +38981,13 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
                     baseUrl: locationLike && locationLike.href,
                 });
             }
+            if (String(image && image.nodeName).toUpperCase() !== "IMG") {
+                // K12: CSS-background / non-IMG surface on Google (outside result cards).
+                const rect = typeof image.getBoundingClientRect === "function" ? image.getBoundingClientRect() : null;
+                const w = Number(image.clientWidth || (rect && rect.width) || 0), h = Number(image.clientHeight || (rect && rect.height) || 0);
+                if (w < MIN_NON_RESULT_IMAGE_PX || h < MIN_NON_RESULT_IMAGE_PX) return [];
+                return resolveQuickHoverImageCandidates(image, { resolvePic: deps.resolvePic, baseUrl: locationLike && locationLike.href });
+            }
             return resolveGoogleImageCandidates(image, {
                 resolvePic: deps.resolvePic,
                 baseUrl: locationLike && locationLike.href,
@@ -38988,7 +39013,8 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
                 activeRequest: null,
                 cancelled: false,
                 copying: false,
-                isGoogleResult: isGoogleImagesLocation(locationLike) && isGoogleResultImage(image),
+                isGoogleResult: isGoogleImagesLocation(locationLike) && (isGoogleResultImage(image) || (String(image.nodeName).toUpperCase() !== "IMG" && candidates.length > 0) || isTinyNonResultItem(image)),
+                notAnImage: isGoogleImagesLocation(locationLike) && isTinyNonResultItem(image) && !isGoogleResultImage(image),
             };
             diagnostic("candidate_resolved", { imageCount: candidates.length, candidateSource: candidates[0] && candidates[0].source || "none", candidateKind: current.isGoogleResult ? "google" : "page" });
         }
@@ -39130,7 +39156,7 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
                 event.preventDefault();
                 if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
                 else if (typeof event.stopPropagation === "function") event.stopPropagation();
-                notify("Koppy: kopyalanamadı: kaynak çözülemedi", "error");
+                notify(current.notAnImage ? "Koppy: bu öğe görsel değil" : "Koppy: kopyalanamadı: kaynak çözülemedi", "error");
                 diagnostic("copy_failed", { flowId: copyFlowId, errorKind: "candidate", errorCode: "candidate-not-found" });
                 return { status: "failed", reason: "candidate-not-found" };
             }
