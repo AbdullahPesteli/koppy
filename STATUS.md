@@ -1,6 +1,6 @@
 # Koppy — Durum
 
-**Sürüm:** 0.5.9
+**Sürüm:** 0.7.0
 **Lisans:** MIT
 **Dağıtım:** `dist/Koppy.user.js` üzerinden Tampermonkey
 

@@ -13,12 +13,20 @@ const previewModulePath = path.join(root, "src/koppy-preview-fit.js");
 const controlDeckModulePath = path.join(root, "src/koppy-control-deck.js");
 const runtimeDir = path.join(root, "vendor/runtime");
 const outputDir = path.join(root, "dist");
-const outputPath = path.join(outputDir, "Koppy.user.js");
+const outputPath = process.env.KOPPY_BUILD_OUT ? path.resolve(process.env.KOPPY_BUILD_OUT) : path.join(outputDir, "Koppy.user.js");
+// Single version authority: package.json. Injected into the @version metadata and the bridge SCRIPT_VERSION.
+const koppyVersion = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version;
+if (!/^\d+\.\d+\.\d+$/.test(koppyVersion)) throw new Error(`Invalid package.json version: ${koppyVersion}`);
+// Planned single release branch (not yet created/published); override via KOPPY_RELEASE_BRANCH.
+const releaseBranch = process.env.KOPPY_RELEASE_BRANCH || "release";
 const marker = "        // 注册按键";
 
 let source = fs.readFileSync(upstreamPath, "utf8");
 const googleModuleSource = fs.readFileSync(modulePath, "utf8");
-const bridgeModuleSource = fs.readFileSync(bridgeModulePath, "utf8");
+const bridgeModuleRaw = fs.readFileSync(bridgeModulePath, "utf8");
+const versionPlaceholderLine = 'const SCRIPT_VERSION = "__KOPPY_VERSION__";';
+if (bridgeModuleRaw.split(versionPlaceholderLine).length !== 2) throw new Error("Bridge SCRIPT_VERSION placeholder must appear exactly once");
+const bridgeModuleSource = bridgeModuleRaw.replace(versionPlaceholderLine, () => `const SCRIPT_VERSION = "${koppyVersion}";`);
 const diagnosticsModuleSource = fs.readFileSync(diagnosticsModulePath, "utf8");
 const settingsModuleSource = fs.readFileSync(settingsModulePath, "utf8");
 const previewModuleSource = fs.readFileSync(previewModulePath, "utf8");
@@ -75,7 +83,7 @@ const replacements = new Map([
     ["// @name:pt-BR           Picviewer CE+", "// @name:pt-BR           Koppy"],
     ["// @name:ru              Picviewer CE+", "// @name:ru              Koppy"],
     ["// @author               NLF && ywzhaiqi && hoothin", "// @author               NLF && ywzhaiqi && hoothin; Koppy fork by pestly"],
-    ["// @version              2026.2.6.1", "// @version              0.6.0"],
+    ["// @version              2026.2.6.1", "// @version              " + koppyVersion],
     ["// @namespace            https://github.com/hoothin/UserScripts", "// @namespace            https://github.com/AbdullahPesteli/koppy"],
     ["// @homepage             https://pv.hoothin.com/", "// @homepage             https://github.com/AbdullahPesteli/koppy"],
     ["// @supportURL           https://github.com/hoothin/UserScripts/issues", "// @supportURL           https://github.com/AbdullahPesteli/koppy/issues"],
@@ -86,7 +94,7 @@ for (const [from, to] of replacements) {
     source = source.replace(from, to);
 }
 
-const updateUrl = "https://raw.githubusercontent.com/AbdullahPesteli/koppy/master/dist/Koppy.user.js";
+const updateUrl = "https://raw.githubusercontent.com/AbdullahPesteli/koppy/" + releaseBranch + "/dist/Koppy.user.js";
 const koppyUpdateMetadata = "// @updateURL            " + updateUrl + "\n// @downloadURL          " + updateUrl;
 const koppySupportUrl = "// @supportURL           https://github.com/AbdullahPesteli/koppy/issues";
 if (!source.includes(koppySupportUrl)) throw new Error("Koppy support URL marker missing after metadata replacement");
@@ -367,6 +375,6 @@ const controlDeckIntegration = `        const koppyOpenUpdate = () => _GM_openIn
 `;
 source = source.replace(marker, diagnosticsPersistence + integration + controlDeckIntegration + marker);
 
-fs.mkdirSync(outputDir, { recursive: true });
+fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 fs.writeFileSync(outputPath, source);
 console.log(`Built ${path.relative(root, outputPath)} (${source.length} bytes)`);

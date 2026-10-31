@@ -9,7 +9,7 @@
     // never opens a loopback socket and receives a final result only after the
     // native host has written the macOS pasteboard.
     const CHANNEL = "koppy-bridge-v1";
-    const SCRIPT_VERSION = "0.6.0";
+    const SCRIPT_VERSION = "__KOPPY_VERSION__";
     const MAX_ITEMS = 10;
     const MAX_BYTES = 150 * 1024 * 1024;
     const instances = typeof WeakMap === "function" ? new WeakMap() : null;
