@@ -50,8 +50,8 @@ test("Koppy Bridge replaces a previous page listener instead of leaking it", asy
 
 test("Koppy Bridge requires a recent trusted companion arm", async () => {
     const win = fakeWindow();
-    const bridge = KoppyBridge.create({ window: win, crypto: { getRandomValues(bytes) { bytes.fill(1); } } });
-    await assert.rejects(bridge.writeImages([{ blob: png() }, { blob: png() }]), /Companion kurulu veya etkin değil/);
+    const bridge = KoppyBridge.create({ window: win, httpRequest: null, crypto: { getRandomValues(bytes) { bytes.fill(1); } } });
+    await assert.rejects(bridge.writeImages([{ blob: png() }, { blob: png() }]), /köprü kurulu değil/);
 });
 
 test("Koppy Bridge turns an explicit Native Messaging failure into a visible error", async () => {
