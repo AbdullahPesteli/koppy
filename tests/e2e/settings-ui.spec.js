@@ -118,6 +118,25 @@ async function expectSettingsClosed(page) {
     await expect.poll(() => page.frames().length).toBe(1);
 }
 
+// Headless Chrome does not deliver synthetic mouse input to the bottom band of a
+// sandboxed data:-URL iframe (an out-of-process child frame). Measured on a page with
+// no Koppy code at 560x760: the child frame receives mousemove up to clientY 651 of
+// 742 in headless Chrome, but up to clientY 731 (the window edge) in headed Chrome,
+// so a real browser user is not affected - only the automation path is. The dropped
+// band is the last ~90px of the browser window: whenever the dialog grows to the
+// window bottom (560x760 narrow layout, or the 1280x720 default used by the legacy
+// test) its footer sits inside it.
+// Footer actions are therefore activated the way a keyboard user reaches them - focus
+// plus Enter - which still makes Chrome emit a trusted click inside the sandboxed
+// frame, so Koppy's untrusted-click guard stays exercised and no assertion is relaxed.
+async function activateFooterButton(page, frame, selector) {
+    const button = frame.locator(selector);
+    await expect(button).toBeEnabled();
+    await button.focus();
+    await expect(button).toBeFocused();
+    await page.keyboard.press("Enter");
+}
+
 test("real dist settings are readable, searchable, persistent and responsive", async ({ page }) => {
     const pageErrors = [];
     const consoleErrors = [];
@@ -305,11 +324,11 @@ test("real dist settings are readable, searchable, persistent and responsive", a
     const narrowDebug = frame.locator("#pv-prefs_field_debug");
     await narrowDebug.uncheck();
     await page.evaluate(() => { window.__failGmWrites = true; });
-    await frame.locator("#pv-prefs_saveBtn").click();
+    await activateFooterButton(page, frame, "#pv-prefs_saveBtn");
     expect(page.frames().length).toBe(2);
     await expect(frame.locator(".koppy-dirty-status")).toContainText("kaydedilemedi");
     await page.evaluate(() => { window.__failGmWrites = false; });
-    await frame.locator("#pv-prefs_saveBtn").click();
+    await activateFooterButton(page, frame, "#pv-prefs_saveBtn");
     await expectSettingsClosed(page);
 
     frame = await openSettings(page);
@@ -333,7 +352,7 @@ test("real dist settings are readable, searchable, persistent and responsive", a
         return option && option.value;
     });
     await language.selectOption(alternateLanguage);
-    await frame.locator("#pv-prefs_saveBtn").click();
+    await activateFooterButton(page, frame, "#pv-prefs_saveBtn");
     await expectSettingsClosed(page);
 
     frame = await openSettings(page);
@@ -341,9 +360,11 @@ test("real dist settings are readable, searchable, persistent and responsive", a
     await expect(frame.locator("#pv-prefs_field_customLang")).toHaveValue(alternateLanguage);
     await frame.locator("#pv-prefs_resetLink").click();
     await expect(frame.locator("#pv-prefs_field_customLang")).toHaveValue(alternateLanguage);
-    await frame.locator("#pv-prefs_resetLink").click();
+    // "Sıfırla" is a two-step confirmation: the first activation only arms it.
+    await activateFooterButton(page, frame, "#pv-prefs_resetLink");
+    await activateFooterButton(page, frame, "#pv-prefs_resetLink");
     await expect(frame.locator("#pv-prefs_field_customLang")).toHaveValue("auto");
-    await frame.locator("#pv-prefs_saveBtn").click();
+    await activateFooterButton(page, frame, "#pv-prefs_saveBtn");
     await expectSettingsClosed(page);
 
     frame = await openSettings(page);
@@ -408,7 +429,7 @@ test("legacy multi-select modifier is visibly migrated and persists only after s
     await expect(frame.locator("#pv-prefs_field_floatBar\\.globalkeys\\.ctrl")).not.toBeChecked();
     await expect(frame.locator(".koppy-dirty-status")).toContainText("tek seçime geçirildi");
     await expect(frame.locator("#pv-prefs_saveBtn")).toBeEnabled();
-    await frame.locator("#pv-prefs_saveBtn").click();
+    await activateFooterButton(page, frame, "#pv-prefs_saveBtn");
     await expectSettingsClosed(page);
 
     const saved = await page.evaluate(() => JSON.parse(window.__gmValues.get("pv-prefs")));
