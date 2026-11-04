@@ -92,7 +92,7 @@ test("Koppy settings shell rebuilds all panels without replacing field nodes", (
 
     assert.equal(doc.querySelector(".koppy-brand-title").textContent, "Koppy Ayarları");
     assert.deepEqual(Array.from(doc.querySelectorAll(".nav-tabs .section_header")).map(node => node.textContent), [
-        "Araç Çubuğu", "Yakınlaştırma", "Galeri", "Resim Penceresi", "Genel",
+        "Araç çubuğu", "Yakınlaştırma", "Galeri", "Resim Penceresi", "Genel",
     ]);
     assert.equal(doc.querySelectorAll(".koppy-card").length, 5);
     assert.equal(config.fields.debug.node, originalNode);

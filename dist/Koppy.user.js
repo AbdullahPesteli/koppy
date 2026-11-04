@@ -34185,8 +34185,8 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
 
     const SECTION_META = [
         {
-            title: "Araç Çubuğu",
-            short: "Araç Çubuğu",
+            title: "Araç çubuğu",
+            short: "Araç çubuğu",
             description: "Hover araçlarını, önizleme davranışını ve görünme sınırlarını yönet.",
         },
         {
@@ -34318,6 +34318,8 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
         .koppy-brand-title { color: var(--k-text); font-size: 19px; font-weight: 680; line-height: 1.2; }
         .koppy-brand-subtitle { margin-top: 2px; color: var(--k-text-muted); font-size: 11px; letter-spacing: .03em; }
 
+        #koppy-settings-return { padding: 0; border: 0; background: none; color: var(--k-text-muted); font: inherit; font-size: 11px; cursor: pointer; }
+        #koppy-settings-return:hover { color: var(--k-text); }
         .koppy-search-wrap { position: relative; }
         .koppy-search-icon {
             position: absolute;
@@ -34891,7 +34893,7 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
     function secureRenderer() {
         "use strict";
         const SECTION_META = [
-            ["Araç Çubuğu", "Hover araçlarını, önizleme davranışını ve görünme sınırlarını yönet."],
+            ["Araç çubuğu", "Hover araçlarını, önizleme davranışını ve görünme sınırlarını yönet."],
             ["Yakınlaştırma", "Büyütecin boyutunu, tekerlek davranışını ve yakınlaştırma adımlarını ayarla."],
             ["Galeri", "Galeri görünümünü, toplu yüklemeyi, indirmeyi ve dışa aktarmayı yönet."],
             ["Resim Penceresi", "Tam boy görsel penceresinin yerleşimini, kontrollerini ve görünümünü ayarla."],
@@ -35342,7 +35344,7 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
                 <div id="pv-prefs_header" class="config_header">
                     <div class="koppy-brand"><div class="koppy-brand-mark">K</div><div class="koppy-brand-copy">
                         <div id="koppy-settings-title" class="koppy-brand-title">Koppy Ayarları</div>
-                        <div class="koppy-brand-subtitle">KİŞİSEL GÖRSEL ARAÇLARI</div></div></div>
+                        <div class="koppy-brand-subtitle">Ayrıntılı ayarlar</div><button id="koppy-settings-return" type="button" hidden>Kontrol Merkezi’ne dön</button></div></div>
                     <label class="koppy-search-wrap" for="koppy-settings-search"><span class="koppy-search-icon">⌕</span>
                         <input id="koppy-settings-search" type="search" autocomplete="off" placeholder="Ayarlarda ara…" aria-label="Ayarlarda ara">
                         <span class="koppy-search-hint">⌘K</span></label>
@@ -35488,7 +35490,10 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
                 port.postMessage({ type: "close", token: sessionToken });
             };
             document.getElementById("pv-prefs_closeBtn").addEventListener("click", requestClose);
-            document.getElementById("koppy-settings-close").addEventListener("click", requestClose);
+            wrapper.querySelector("#koppy-settings-close").addEventListener("click", requestClose);
+            const returnButton = wrapper.querySelector("#koppy-settings-return");
+            returnButton.hidden = !payload.returnToDeck;
+            returnButton.addEventListener("click", requestClose);
             const reset = document.getElementById("pv-prefs_resetLink");
             reset.addEventListener("click", event => {
                 event.preventDefault();
@@ -35817,6 +35822,7 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
                 token,
                 schema: serializeSchema(config),
                 activeIndex: Number.isInteger(config.__koppyTab) ? config.__koppyTab : 4,
+                returnToDeck: Boolean(config.__koppyReturnToDeck),
             }, "*", [channel.port2]);
         }, { once: true });
         mountFrame(frame, hostDocument);
@@ -36447,6 +36453,7 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
 });
 
 
+        let koppyReturnToDeck = false;
         globalThis.KoppySettingsUI.install({
             config: GM_config,
             document: document,
@@ -36463,7 +36470,14 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
                 }
             },
             onOpenState: () => { isConfigOpen = true; },
-            onCloseState: () => { isConfigOpen = false; },
+            onCloseState: () => {
+                isConfigOpen = false;
+                if (koppyReturnToDeck) {
+                    koppyReturnToDeck = false;
+                    GM_config.__koppyReturnToDeck = false;
+                    koppyControlDeck.show();
+                }
+            },
 });
 
 (function (root, factory) {
@@ -36888,7 +36902,7 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
             full.addEventListener("click", event => {
                 if (!isUserEvent(event)) return;
                 hide();
-                if (typeof settings.openFullSettings === "function") settings.openFullSettings();
+                if (typeof settings.openFullSettings === "function") settings.openFullSettings(activeTab);
             });
             footer.appendChild(full);
             panel.appendChild(footer);
@@ -36944,7 +36958,7 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
 
         function show() {
             if (config.isOpen) {
-                if (typeof settings.openFullSettings === "function") settings.openFullSettings();
+                if (typeof settings.openFullSettings === "function") settings.openFullSettings(activeTab);
                 return false;
             }
             ensure();
@@ -39581,7 +39595,12 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
             window: window,
             getFloatBar: () => floatBar,
             getPreview: () => uniqueImgWin,
-            openFullSettings: () => globalThis.KoppySettingsUI.openSecure(),
+            openFullSettings: section => {
+                koppyReturnToDeck = true;
+                GM_config.__koppyReturnToDeck = true;
+                GM_config.__koppyTab = section === "control" || section === "behavior" ? 0 : 4;
+                globalThis.KoppySettingsUI.openSecure();
+            },
             openUpdate: koppyOpenUpdate,
             installedVersion: GM_info.script.version,
             updateUrl: "https://raw.githubusercontent.com/AbdullahPesteli/koppy/release/dist/Koppy.user.js",

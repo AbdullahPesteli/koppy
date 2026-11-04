@@ -99,8 +99,10 @@ async function openSettings(page) {
     // The Tampermonkey menu is deliberately a single compact Control Centre;
     // exercise the real entry and then its in-panel Settings action.
     await expect.poll(() => page.evaluate(() => window.__commands.map(command => command.label))).toEqual(["Koppy · Kontrol Merkezi"]);
-    await page.evaluate(() => window.__commands[0].callback());
     const deck = page.locator("koppy-control-deck");
+    if (!await deck.locator(".panel.open").isVisible()) {
+        await page.evaluate(() => window.__commands[0].callback());
+    }
     await expect(deck.locator(".panel.open")).toBeVisible();
     await deck.locator(".full-settings").click();
     await expect.poll(async () => {

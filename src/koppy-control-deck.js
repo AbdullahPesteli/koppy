@@ -420,7 +420,7 @@
             full.addEventListener("click", event => {
                 if (!isUserEvent(event)) return;
                 hide();
-                if (typeof settings.openFullSettings === "function") settings.openFullSettings();
+                if (typeof settings.openFullSettings === "function") settings.openFullSettings(activeTab);
             });
             footer.appendChild(full);
             panel.appendChild(footer);
@@ -476,7 +476,7 @@
 
         function show() {
             if (config.isOpen) {
-                if (typeof settings.openFullSettings === "function") settings.openFullSettings();
+                if (typeof settings.openFullSettings === "function") settings.openFullSettings(activeTab);
                 return false;
             }
             ensure();

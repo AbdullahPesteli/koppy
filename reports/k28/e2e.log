@@ -1,0 +1,87 @@
+
+Running 60 tests using 1 worker
+
+  ✓   1 tests/e2e/bridge-http.spec.js:56:1 › 3 images are written as 3 frames with the right token (603ms)
+  ✓   2 tests/e2e/bridge-http.spec.js:66:1 › missing token never reaches the server and shows a visible error (403ms)
+  ✓   3 tests/e2e/bridge-http.spec.js:77:1 › wrong token → 401 → visible error, nothing written, token not in message (423ms)
+  ✓   4 tests/e2e/bridge-http.spec.js:89:1 › bridge down → 'köprü kurulu değil'; status reports not-installed (628ms)
+  ✓   5 tests/e2e/bridge-http.spec.js:101:1 › rate limit → 429 surfaces as a specific error; status running/no-token (583ms)
+  ✓   6 tests/e2e/bridge-http.spec.js:112:1 › too many images are refused client-side (329ms)
+  ✓   7 tests/e2e/control-deck.spec.js:7:1 › live control deck applies a single modifier, repositions an active bar and stays compact (2.5s)
+  ✓   8 tests/e2e/control-deck.spec.js:138:1 › live control deck uses a bottom sheet on narrow viewports (392ms)
+RESULT a-img {"clip":{"types":["image/png"],"bytes":1686,"mime":"image/png"},"requests":["https://shop.example.test/img/small.jpg"],"toast":"Kopyalandı: 300×200"}
+  ✓   9 tests/e2e/copy-coverage.spec.js:60:5 › copy coverage a-img (1.3s)
+RESULT b-srcset-picture {"clip":{"types":["image/png"],"bytes":1686,"mime":"image/png"},"requests":["https://shop.example.test/img/pic-1600.webp"],"toast":"Kopyalandı: 300×200"}
+  ✓  10 tests/e2e/copy-coverage.spec.js:60:5 › copy coverage b-srcset-picture (1.3s)
+RESULT c-background {"clip":{"types":["image/png"],"bytes":1686,"mime":"image/png"},"requests":["https://shop.example.test/img/bg-hero.jpg"],"toast":"Kopyalandı: 300×200"}
+  ✓  11 tests/e2e/copy-coverage.spec.js:60:5 › copy coverage c-background (1.3s)
+RESULT d-google-preview-only {"clip":{"types":["image/png"],"bytes":1686,"mime":"image/png"},"requests":["https://encrypted-tbn0.gstatic.com/images?q=tbn:ONLYPREVIEW&s=10"],"toast":"Önizleme kopyalandı: 300×200"}
+  ✓  12 tests/e2e/copy-coverage.spec.js:60:5 › copy coverage d-google-preview-only (1.4s)
+RESULT e-data-uri {"clip":{"types":["image/png"],"bytes":1686,"mime":"image/png"},"requests":["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAIAAADYYG7QAAAAQUlEQVR4nO3OQQ0AIAwAsQlHCl7BBcejSQV01j5fmXwgJCQkVA+EhISE6oGQkJBQPRASEhKqB0JCQkL1QEhI6LELY/jQDy1qpikAAAAASUVORK5CYII="],"toast":"Önizleme kopyalandı: 300×200"}
+  ✓  13 tests/e2e/copy-coverage.spec.js:60:5 › copy coverage e-data-uri (1.2s)
+  ✓  14 tests/e2e/copy-coverage.spec.js:71:1 › text selection keeps native Cmd+C (411ms)
+  ✓  15 tests/e2e/copy-coverage.spec.js:79:1 › unresolvable source shows honest visible error (no silent drop) (1.3s)
+  ✓  16 tests/e2e/google-copy.spec.js:28:1 › hover + Cmd+C writes one 320×180 PNG and preserves input copy (943ms)
+  ✓  17 tests/e2e/google-copy.spec.js:138:1 › Recent Copies keeps normal clipboard behavior and exposes a magnetic, clickable cursor badge (2.4s)
+  ✓  18 tests/e2e/google-copy.spec.js:246:1 › built Koppy userscript boots with Tampermonkey-shaped grants and resolves current udm=2 metadata (1.2s)
+  ✓  19 tests/e2e/google-copy.spec.js:319:1 › built Koppy copies a normal Google result embedded as data:image without GM networking (946ms)
+  ✓  20 tests/e2e/google-copy.spec.js:359:1 › built Koppy userscript copies a visible QuickHover image on Wikipedia (1.4s)
+  ✓  21 tests/e2e/google-copy.spec.js:416:1 › built Koppy renders a PDF first page locally to PNG (817ms)
+  ✓  22 tests/e2e/google-copy.spec.js:459:1 › text-sized Turkcell-style PDF and AI links accept hover + Cmd+C (566ms)
+  ✓  23 tests/e2e/google-copy.spec.js:498:1 › holding Cmd previews a text-sized PDF link before copy (442ms)
+  ✓  24 tests/e2e/google-copy.spec.js:534:1 › built Koppy uses the native Picviewer preview shell for a document link (1.7s)
+  ✓  25 tests/e2e/legacy-toolbar.spec.js:43:1 › controller acquisition has zero unhandled errors (3.4s)
+  ✓  26 tests/e2e/legacy-toolbar.spec.js:47:1 › explicit saved-key preview creates a real image window (2.6s)
+  ✓  27 tests/e2e/legacy-toolbar.spec.js:51:1 › legacy hitboxes absent; underlying menu receives exactly one click (3.4s)
+  ✓  28 tests/e2e/legacy-toolbar.spec.js:58:1 › Cmd+C produces PNG bytes and selected text copy is not intercepted (3.3s)
+RESULT google-udm2/e-natural-data-uri-card {"clip":{"types":["image/png"],"mime":"image/png","bytes":784568,"dim":"1004x1002"},"requests":[{"url":"https://petgross.com.tr/images/095577b2-7631-4970-aac8-f67dc0fdb305/f61354c9-7da9-4646-ace5-5802b079dcc7/image_1080.jpg","status":200,"ctype":"image/webp","bytes":41892}],"toast":"Kopyalandı: 1004×1002","feedback":"Kopyalandı · 1004×1002"}
+  ✓  29 tests/e2e/real-layout.spec.js:127:9 › google-udm2 · e doğal: data: URI kart (gerçek Google) (3.4s)
+RESULT google-udm2/d-natural-preview-only-card {"clip":{"types":["image/png"],"mime":"image/png","bytes":1150543,"dim":"1200x800"},"requests":[{"url":"https://cdn.oggusto.com/uploads/2025/07/kedilerde-agiz-acik-nefes-alma-uyarisi.webp","status":200,"ctype":"image/webp","bytes":123240}],"toast":"Kopyalandı: 1200×800","feedback":"Kopyalandı · 1200×800"}
+  ✓  30 tests/e2e/real-layout.spec.js:133:9 › google-udm2 · d doğal: yalnız preview (tbn) kartı (gerçek Google) (3.3s)
+RESULT google-udm2/a-injected {"clip":{"types":["image/png"],"mime":"image/png","bytes":61241,"dim":"240x135"},"requests":[{"url":"https://ichef.bbci.co.uk/news/240/cpsprodpb/ea75/live/f93e2820-d4b7-11f1-a701-fddedf244c16.jpg.webp","status":200,"ctype":"image/webp","bytes":6962}],"toast":"Kopyalandı: 240×135","feedback":"Kopyalandı · 240×135"}
+  ✓  31 tests/e2e/real-layout.spec.js:153:9 › google-udm2 · a enjekte (3.4s)
+RESULT google-udm2/b-injected {"clip":{"types":["image/png"],"mime":"image/png","bytes":61241,"dim":"240x135"},"requests":[{"url":"https://ichef.bbci.co.uk/news/240/cpsprodpb/ea75/live/f93e2820-d4b7-11f1-a701-fddedf244c16.jpg.webp","status":200,"ctype":"image/webp","bytes":6962}],"toast":"Kopyalandı: 240×135","feedback":"Kopyalandı · 240×135"}
+  ✓  32 tests/e2e/real-layout.spec.js:153:9 › google-udm2 · b enjekte (3.5s)
+RESULT google-udm2/c-injected {"clip":{"types":["image/png"],"mime":"image/png","bytes":1869224,"dim":"1536x864"},"requests":[{"url":"https://ichef.bbci.co.uk/news/1536/cpsprodpb/ea75/live/f93e2820-d4b7-11f1-a701-fddedf244c16.jpg.webp","status":200,"ctype":"image/webp","bytes":159996}],"toast":"Kopyalandı: 1536×864","feedback":"Kopyalandı · 1536×864"}
+  ✓  33 tests/e2e/real-layout.spec.js:153:9 › google-udm2 · c enjekte (3.6s)
+RESULT google-udm2/e-injected {"clip":{"types":["text/plain"],"bytes":0},"requests":[],"toast":"Koppy: bu öğe görsel değil","feedback":""}
+  ✓  34 tests/e2e/real-layout.spec.js:153:9 › google-udm2 · e enjekte (4.1s)
+RESULT google-tbm-isch/e-natural-data-uri-card {"clip":{"types":["image/png"],"mime":"image/png","bytes":1150543,"dim":"1200x800"},"requests":[{"url":"https://cdn.oggusto.com/uploads/2025/07/kedilerde-agiz-acik-nefes-alma-uyarisi.webp","status":200,"ctype":"image/webp","bytes":123240}],"toast":"Kopyalandı: 1200×800","feedback":"Kopyalandı · 1200×800"}
+  ✓  35 tests/e2e/real-layout.spec.js:127:9 › google-tbm-isch · e doğal: data: URI kart (gerçek Google) (3.9s)
+RESULT google-tbm-isch/d-natural-preview-only-card {"na":true,"note":"snapshot'ta tbn: URL'li kart yok (hepsi data: placeholder); docid'li img=200","clip":{"types":[],"bytes":0},"requests":[],"toast":""}
+  ✓  36 tests/e2e/real-layout.spec.js:133:9 › google-tbm-isch · d doğal: yalnız preview (tbn) kartı (gerçek Google) (1.2s)
+RESULT google-tbm-isch/a-injected {"clip":{"types":["image/png"],"mime":"image/png","bytes":61241,"dim":"240x135"},"requests":[{"url":"https://ichef.bbci.co.uk/news/240/cpsprodpb/ea75/live/f93e2820-d4b7-11f1-a701-fddedf244c16.jpg.webp","status":200,"ctype":"image/webp","bytes":6962}],"toast":"Kopyalandı: 240×135","feedback":"Kopyalandı · 240×135"}
+  ✓  37 tests/e2e/real-layout.spec.js:153:9 › google-tbm-isch · a enjekte (3.5s)
+RESULT google-tbm-isch/b-injected {"clip":{"types":["image/png"],"mime":"image/png","bytes":61241,"dim":"240x135"},"requests":[{"url":"https://ichef.bbci.co.uk/news/240/cpsprodpb/ea75/live/f93e2820-d4b7-11f1-a701-fddedf244c16.jpg.webp","status":200,"ctype":"image/webp","bytes":6962}],"toast":"Kopyalandı: 240×135","feedback":"Kopyalandı · 240×135"}
+  ✓  38 tests/e2e/real-layout.spec.js:153:9 › google-tbm-isch · b enjekte (3.2s)
+RESULT google-tbm-isch/c-injected {"clip":{"types":["image/png"],"mime":"image/png","bytes":1869224,"dim":"1536x864"},"requests":[{"url":"https://ichef.bbci.co.uk/news/1536/cpsprodpb/ea75/live/f93e2820-d4b7-11f1-a701-fddedf244c16.jpg.webp","status":200,"ctype":"image/webp","bytes":159996}],"toast":"Kopyalandı: 1536×864","feedback":"Kopyalandı · 1536×864"}
+  ✓  39 tests/e2e/real-layout.spec.js:153:9 › google-tbm-isch · c enjekte (3.2s)
+RESULT google-tbm-isch/e-injected {"clip":{"types":["text/plain"],"bytes":0},"requests":[],"toast":"Koppy: bu öğe görsel değil","feedback":""}
+  ✓  40 tests/e2e/real-layout.spec.js:153:9 › google-tbm-isch · e enjekte (3.7s)
+RESULT bbc-news/ab-natural-img-srcset {"srcset":true,"clip":{"types":["image/png"],"mime":"image/png","bytes":1869224,"dim":"1536x864"},"requests":[{"url":"https://ichef.bbci.co.uk/news/1536/cpsprodpb/ea75/live/f93e2820-d4b7-11f1-a701-fddedf244c16.jpg.webp","status":200,"ctype":"image/webp","bytes":159996}],"toast":"Kopyalandı: 1536×864","feedback":"Kopyalandı · 1536×864"}
+  ✓  41 tests/e2e/real-layout.spec.js:144:9 › bbc-news · a doğal: gerçek <img> (BBC) (3.3s)
+RESULT bbc-news/a-injected {"clip":{"types":["image/png"],"mime":"image/png","bytes":61241,"dim":"240x135"},"requests":[{"url":"https://ichef.bbci.co.uk/news/240/cpsprodpb/ea75/live/f93e2820-d4b7-11f1-a701-fddedf244c16.jpg.webp","status":200,"ctype":"image/webp","bytes":6962}],"toast":"Kopyalandı: 240×135","feedback":"Kopyalandı · 240×135"}
+  ✓  42 tests/e2e/real-layout.spec.js:153:9 › bbc-news · a enjekte (2.8s)
+RESULT bbc-news/b-injected {"clip":{"types":["image/png"],"mime":"image/png","bytes":61241,"dim":"240x135"},"requests":[{"url":"https://ichef.bbci.co.uk/news/240/cpsprodpb/ea75/live/f93e2820-d4b7-11f1-a701-fddedf244c16.jpg.webp","status":200,"ctype":"image/webp","bytes":6962}],"toast":"Kopyalandı: 240×135","feedback":"Kopyalandı · 240×135"}
+  ✓  43 tests/e2e/real-layout.spec.js:153:9 › bbc-news · b enjekte (3.3s)
+RESULT bbc-news/c-injected {"clip":{"types":["image/png"],"mime":"image/png","bytes":1869224,"dim":"1536x864"},"requests":[{"url":"https://ichef.bbci.co.uk/news/1536/cpsprodpb/ea75/live/f93e2820-d4b7-11f1-a701-fddedf244c16.jpg.webp","status":200,"ctype":"image/webp","bytes":159996}],"toast":"Kopyalandı: 1536×864","feedback":"Kopyalandı · 1536×864"}
+  ✓  44 tests/e2e/real-layout.spec.js:153:9 › bbc-news · c enjekte (3.2s)
+RESULT bbc-news/e-injected {"clip":{"types":["text/plain"],"bytes":0},"requests":[],"toast":"Koppy: kopyalanamadı: kaynak çözülemedi","feedback":""}
+  ✓  45 tests/e2e/real-layout.spec.js:153:9 › bbc-news · e enjekte (4.4s)
+  ✓  46 tests/e2e/settings-bridge-onboarding.spec.js:154:1 › Köprü bölümü görünür: durum satırı, token alanı, test düğmesi, token ipucu + kopyala (1.9s)
+  ✓  47 tests/e2e/settings-bridge-onboarding.spec.js:168:1 › Bağlantıyı test et: 200 -> hazır, 401 -> token yanlış (sahte köprü) (2.4s)
+  ✓  48 tests/e2e/settings-bridge-onboarding.spec.js:187:1 › Bağlantıyı test et: köprü yoksa -> köprü çalışmıyor + kurulum komutu (1.5s)
+  ✓  49 tests/e2e/settings-continuity.spec.js:34:1 › toolbar details land on the toolbar category (1.4s)
+  ✓  50 tests/e2e/settings-continuity.spec.js:41:1 › details use a consistent toolbar heading and offer a return link (1.4s)
+  ✓  51 tests/e2e/settings-continuity.spec.js:50:5 › details escape returns to tools after the General fallback (1.6s)
+  ✓  52 tests/e2e/settings-continuity.spec.js:50:5 › details cancel returns to tools after the General fallback (1.3s)
+  ✓  53 tests/e2e/settings-continuity.spec.js:50:5 › details save returns to tools after the General fallback (1.3s)
+  ✓  54 tests/e2e/settings-continuity.spec.js:64:1 › closing details returns to the same control center section (1.5s)
+  ✓  55 tests/e2e/settings-ui.spec.js:143:1 › real dist settings are readable, searchable, persistent and responsive (7.6s)
+  ✓  56 tests/e2e/settings-ui.spec.js:383:1 › related settings are compacted and preview modifier stays single-select (2.4s)
+  ✓  57 tests/e2e/settings-ui.spec.js:424:1 › legacy multi-select modifier is visibly migrated and persists only after save (1.6s)
+  ✓  58 tests/e2e/update-check.spec.js:9:5 › inline release check: 0.8.2 (780ms)
+  ✓  59 tests/e2e/update-check.spec.js:9:5 › inline release check: 0.8.3 (614ms)
+  ✓  60 tests/e2e/update-check.spec.js:9:5 › inline release check: error (581ms)
+
+  60 passed (2.1m)

@@ -37,7 +37,8 @@ const controlDeckModuleSource = fs.readFileSync(controlDeckModulePath, "utf8");
 // fail to parse before any feature could start.
 const pdfJsSource = fs.readFileSync(path.join(root, "node_modules/pdfjs-dist/build/pdf.mjs"), "utf8");
 const pdfWorkerSource = fs.readFileSync(path.join(root, "node_modules/pdfjs-dist/build/pdf.worker.mjs"), "utf8");
-const moduleSource = `${settingsModuleSource}\n\n${diagnosticsModuleSource}\n\n        globalThis.KoppySettingsUI.install({
+const moduleSource = `${settingsModuleSource}\n\n${diagnosticsModuleSource}\n\n        let koppyReturnToDeck = false;
+        globalThis.KoppySettingsUI.install({
             config: GM_config,
             document: document,
             window: window,
@@ -53,7 +54,14 @@ const moduleSource = `${settingsModuleSource}\n\n${diagnosticsModuleSource}\n\n 
                 }
             },
             onOpenState: () => { isConfigOpen = true; },
-            onCloseState: () => { isConfigOpen = false; },
+            onCloseState: () => {
+                isConfigOpen = false;
+                if (koppyReturnToDeck) {
+                    koppyReturnToDeck = false;
+                    GM_config.__koppyReturnToDeck = false;
+                    koppyControlDeck.show();
+                }
+            },
 });\n\n${controlDeckModuleSource}\n\n${previewModuleSource}\n\n${bridgeModuleSource}\n\n${googleModuleSource}\n\n        const koppyBridge = globalThis.KoppyBridge.create({ diagnostics: globalThis.KoppyDiagnostics });\n        const koppyCreateController = globalThis.KoppyGoogleCopy.createController;\n        globalThis.KoppyGoogleCopy.createController = dependencies => koppyCreateController(Object.assign({}, dependencies, {\n            diagnostics: globalThis.KoppyDiagnostics,\n            onRecentCopiesAccepted: items => koppyBridge.writeImages(items),\n        }));`;
 const runtimeHashes = new Map(fs.readFileSync(path.join(runtimeDir, "SHA256SUMS"), "utf8").trim().split("\n").map(line => {
     const match = line.match(/^([0-9a-f]{64})\s+(.+)$/);
@@ -366,7 +374,12 @@ const controlDeckIntegration = `        const koppyOpenUpdate = globalThis.Koppy
             window: window,
             getFloatBar: () => floatBar,
             getPreview: () => uniqueImgWin,
-            openFullSettings: () => globalThis.KoppySettingsUI.openSecure(),
+            openFullSettings: section => {
+                koppyReturnToDeck = true;
+                GM_config.__koppyReturnToDeck = true;
+                GM_config.__koppyTab = section === "control" || section === "behavior" ? 0 : 4;
+                globalThis.KoppySettingsUI.openSecure();
+            },
             openUpdate: koppyOpenUpdate,
             installedVersion: GM_info.script.version,
             updateUrl: ${JSON.stringify(updateUrl)},
