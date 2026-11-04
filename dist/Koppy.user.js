@@ -30745,8 +30745,7 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
             init:function(){
                 this.addStyle();
                 var container=document.createElement('span');
-                container.id='pv-float-bar-container';
-                getBody(document).appendChild(container);
+                container.id='pv-float-bar-container'; // KOPPY_DETACHED_LEGACY_FLOATBAR
                 for(let i=0;i<prefs.floatBar.butonOrder.length;i++){
                     let spanChild=document.createElement('span');
                     spanChild.className='pv-float-bar-button';
@@ -32500,7 +32499,7 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
                         checkUniqueImgWin();
 
                         if (!floatBar) {
-                            floatBar = null; // KOPPY_DISABLE_LEGACY_FLOATBAR
+                            floatBar = new FloatBarC();
                         }
                         floatBar.start(result);
 
@@ -32790,7 +32789,7 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
                     checkUniqueImgWin();
 
                     if (!floatBar) {
-                        floatBar = null; // KOPPY_DISABLE_LEGACY_FLOATBAR
+                        floatBar = new FloatBarC();
                     }
                     floatBar.start(result);
                 }
@@ -32846,7 +32845,7 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
                     }
                 }
                 if (!floatBar) {
-                    floatBar = null; // KOPPY_DISABLE_LEGACY_FLOATBAR
+                    floatBar = new FloatBarC();
                 }
                 if (result.type == 'rule' && matchedRule.clickToOpen && matchedRule.clickToOpen.enabled) {
                     if (canclePreCTO) {//取消上次的，防止一次点击打开多张图片
