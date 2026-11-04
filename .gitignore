@@ -26,3 +26,7 @@ picviewer-re/
 # Local build/test leftovers (not shipped)
 bun.lock
 tests/e2e/legacy-toolbar-artifacts/
+
+bun.lock
+tests/e2e/legacy-toolbar-artifacts/
+tests/e2e/update-check-artifacts/
