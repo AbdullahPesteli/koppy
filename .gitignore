@@ -22,3 +22,7 @@ docs/private/
 # Local research archive (39 MB browser archive; the notes live in docs/re/)
 picviewer-re/
 .worktrees/
+
+# Local build/test leftovers (not shipped)
+bun.lock
+tests/e2e/legacy-toolbar-artifacts/
