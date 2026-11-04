@@ -32500,7 +32500,7 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
                         checkUniqueImgWin();
 
                         if (!floatBar) {
-                            floatBar = new FloatBarC();
+                            floatBar = null; // KOPPY_DISABLE_LEGACY_FLOATBAR
                         }
                         floatBar.start(result);
 
@@ -32790,7 +32790,7 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
                     checkUniqueImgWin();
 
                     if (!floatBar) {
-                        floatBar = new FloatBarC();
+                        floatBar = null; // KOPPY_DISABLE_LEGACY_FLOATBAR
                     }
                     floatBar.start(result);
                 }
@@ -32846,7 +32846,7 @@ let h=null;class g{constructor(e){h=h||function(){var e=[[[],[],[],[],[]],[[],[]
                     }
                 }
                 if (!floatBar) {
-                    floatBar = new FloatBarC();
+                    floatBar = null; // KOPPY_DISABLE_LEGACY_FLOATBAR
                 }
                 if (result.type == 'rule' && matchedRule.clickToOpen && matchedRule.clickToOpen.enabled) {
                     if (canclePreCTO) {//取消上次的，防止一次点击打开多张图片
