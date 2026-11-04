@@ -321,7 +321,10 @@ const diagnosticsPersistence = `        const _GM_setValue = typeof GM_setValue 
             });
         }
 `;
-const controlDeckIntegration = `        const koppyOpenUpdate = () => _GM_openInTab(${JSON.stringify(updateUrl)}, {active:true});
+const controlDeckIntegration = `        const koppyOpenUpdate = globalThis.KoppyControlDeck.createUpdateChecker({
+            url: ${JSON.stringify(updateUrl)}, version: GM_info.script.version,
+            request: options => GM_xmlhttpRequest(options),
+        });
         const koppyCopyDiagnostics = () => {
             const text = globalThis.KoppyDiagnostics && globalThis.KoppyDiagnostics.summaryText
                 ? globalThis.KoppyDiagnostics.summaryText() : "Koppy tanı verisi henüz oluşmadı";
@@ -365,6 +368,10 @@ const controlDeckIntegration = `        const koppyOpenUpdate = () => _GM_openIn
             getPreview: () => uniqueImgWin,
             openFullSettings: () => globalThis.KoppySettingsUI.openSecure(),
             openUpdate: koppyOpenUpdate,
+            installedVersion: GM_info.script.version,
+            updateUrl: ${JSON.stringify(updateUrl)},
+            copyUpdateUrl: () => _GM_setClipboard(${JSON.stringify(updateUrl)}, "text"),
+            openRawUpdate: () => _GM_openInTab(${JSON.stringify(updateUrl)}, {active:true}),
             openGallery: koppyOpenGallery,
             openStitcher: koppyOpenStitcher,
             toggleFloatBar: koppyToggleFloatBar,

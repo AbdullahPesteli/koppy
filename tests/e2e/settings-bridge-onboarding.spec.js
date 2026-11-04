@@ -54,6 +54,7 @@ async function bootBuiltKoppy(page, storedPreferences) {
             window.__openedTabs.push({ url, options });
             return null;
         };
+        window.GM_info = { script: { version: "0.8.2" } };
         window.GM_setClipboard = () => {};
         window.GM_registerMenuCommand = (label, callback) => {
             window.__commands.push({ label, callback });

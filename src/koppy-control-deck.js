@@ -26,6 +26,24 @@
         { id: "wide", label: "Geniş", width: 960, height: 720 },
     ];
 
+    function createUpdateChecker(options) {
+        return () => new Promise((resolve, reject) => {
+            const fail = () => reject(new Error("yayın okunamadı"));
+            try { options.request({
+                method: "GET", url: options.url, cache: false, timeout: 5000,
+                onerror: fail, ontimeout: fail, onabort: fail,
+                onload(response) {
+                    const match = String(response.responseText || "").match(/^\/\/\s*@version\s+(\d+(?:\.\d+)*)(?=\s|$)/m);
+                    if (response.status !== 200 || !match || !/^\d+(?:\.\d+)*$/.test(options.version)) return fail();
+                    const published = match[1].split(".").map(Number);
+                    const installed = options.version.split(".").map(Number);
+                    const difference = published.map((part, index) => part - (installed[index] || 0)).find(part => part !== 0) || 0;
+                    resolve(difference > 0 ? match[1] + " hazır" : "Güncel (" + options.version + ")");
+                },
+            }); } catch (_) { fail(); }
+        });
+    }
+
     function activeModifier(prefs) {
         const keys = prefs && prefs.floatBar && prefs.floatBar.globalkeys || {};
         return (MODIFIERS.find(item => keys[item.id]) || MODIFIERS[3]).id;
@@ -360,16 +378,42 @@
 
             const footer = create(doc, "footer", "footer");
             if (typeof settings.openUpdate === "function") {
-                const update = create(doc, "button", "update", "Koppy’yi güncelle  ↗");
+                const updateCard = card("Güncelleme", "Kurulu sürüm: " + (settings.installedVersion || "bilinmiyor"));
+                const update = create(doc, "button", "update", "Sürümü kontrol et");
                 update.type = "button";
-                update.addEventListener("click", event => {
+                update.addEventListener("click", async event => {
                     if (!isUserEvent(event)) return;
-                    const opened = settings.openUpdate();
-                    setStatus(opened === false
-                        ? "Güncelleme sayfası açılamadı"
-                        : "Güncelleme sayfası açıldı · Tampermonkey kurulumu doğrular", opened === false);
+                    update.disabled = true;
+                    setStatus("Yayın kontrol ediliyor…");
+                    try { setStatus(await settings.openUpdate()); }
+                    catch (_) { setStatus("yayın okunamadı", true); }
+                    finally { update.disabled = false; }
                 });
-                footer.appendChild(update);
+                updateCard.appendChild(update);
+                updateCard.appendChild(create(doc, "p", "hint", "Güncellemeyi Tampermonkey yapar. Tampermonkey → Yardımcı Programlar → URL'den yükle"));
+                const copy = create(doc, "button", "copy-update-url", "URL'yi kopyala");
+                copy.type = "button";
+                copy.addEventListener("click", async event => {
+                    if (!isUserEvent(event)) return;
+                    try {
+                        await settings.copyUpdateUrl();
+                        setStatus("URL kopyalandı · Tampermonkey'de URL'den yükle adımını kullan");
+                    } catch (_) { setStatus("URL kopyalanamadı", true); }
+                });
+                updateCard.appendChild(copy);
+                const raw = create(doc, "a", "raw-update", "ham dosyayı aç");
+                raw.href = settings.updateUrl || "#";
+                raw.style.cssText = "font-size:10px;margin-left:10px;color:#9facc6";
+                raw.addEventListener("click", event => {
+                    event.preventDefault();
+                    if (!isUserEvent(event)) return;
+                    try {
+                        settings.openRawUpdate();
+                        setStatus("Ham dosya açıldı · bu işlem güncelleme onayı değildir");
+                    } catch (_) { setStatus("Ham dosya açılamadı", true); }
+                });
+                updateCard.appendChild(raw);
+                panel.appendChild(updateCard);
             }
             const full = create(doc, "button", "full-settings", "Ayrıntılı ayarlar  →");
             full.type = "button";
@@ -404,7 +448,7 @@
             style.textContent = `
                 :host { all: initial; }
                 *, *::before, *::after { box-sizing: border-box; }
-                .panel { position: fixed; right: 20px; top: 82px; width: min(340px, calc(100vw - 32px)); transform: scale(.98); transform-origin: top right; opacity: 0; pointer-events: none; color: #f4f7fb; background: #11151c; border: 1px solid #2a3340; border-radius: 14px; box-shadow: 0 24px 80px rgba(0,0,0,.55); overflow: hidden; font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; transition: opacity 160ms ease, transform 160ms ease; }
+                .panel { position: fixed; right: 20px; top: 82px; width: min(340px, calc(100vw - 32px)); transform: scale(.98); transform-origin: top right; opacity: 0; pointer-events: none; color: #f4f7fb; background: #11151c; border: 1px solid #2a3340; border-radius: 14px; box-shadow: 0 24px 80px rgba(0,0,0,.55); max-height: min(610px, calc(100vh - 100px)); overflow-y: auto; font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; transition: opacity 160ms ease, transform 160ms ease; }
                 .panel.open { opacity: 1; transform: scale(1); pointer-events: auto; } .panel.manual { transform-origin: top left; } .panel.dragging { transition: none; }
                 header { min-height: 62px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #252e3a; }
                 .title { display: flex; min-width: 0; margin-right: auto; align-items: center; gap: 10px; cursor: grab; user-select: none; touch-action: none; } .panel.dragging .title { cursor: grabbing; }
@@ -511,5 +555,5 @@
         return config.__koppyControlDeck;
     }
 
-    return { MODIFIERS, POSITIONS, SIZES, activeModifier, activeSize, install };
+    return { MODIFIERS, POSITIONS, SIZES, activeModifier, activeSize, install, createUpdateChecker };
 });
